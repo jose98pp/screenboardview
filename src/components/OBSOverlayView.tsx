@@ -26,7 +26,7 @@ export const OBSOverlayView: React.FC<OBSOverlayViewProps> = ({ boardId: propBoa
   const timerRef = useRef<number | null>(null);
 
   // Extract ID and data payload from URL helper
-  const route = typeof window !== 'undefined' ? parseCurrentRoute() : { isOverlay: true, boardId: null, compressedData: null };
+  const route = typeof window !== 'undefined' ? parseCurrentRoute() : { isOverlay: true, boardId: null, compressedData: null, isMuted: false };
   const boardId = propBoardId || route.boardId || undefined;
   const dataParam = route.compressedData;
 
@@ -87,19 +87,21 @@ export const OBSOverlayView: React.FC<OBSOverlayViewProps> = ({ boardId: propBoa
           setIsConnected(true);
           setBoard(updatedBoard);
 
+          const soundActive = !route.isMuted && updatedBoard.overlay?.soundEnabled !== false && (updatedBoard.overlay?.soundVolume ?? 0.7) > 0;
+
           // Detect score changes for animations & sound
           if (lastHomeScore !== null && updatedBoard.homeTeam.score > lastHomeScore) {
             setHomeScoreAnimated(true);
             setTimeout(() => setHomeScoreAnimated(false), 900);
-            if (updatedBoard.overlay?.soundEnabled) {
-              playSound('point', updatedBoard.overlay.soundVolume || 0.6);
+            if (soundActive) {
+              playSound('point', updatedBoard.overlay?.soundVolume ?? 0.6);
             }
           }
           if (lastAwayScore !== null && updatedBoard.awayTeam.score > lastAwayScore) {
             setAwayScoreAnimated(true);
             setTimeout(() => setAwayScoreAnimated(false), 900);
-            if (updatedBoard.overlay?.soundEnabled) {
-              playSound('point', updatedBoard.overlay.soundVolume || 0.6);
+            if (soundActive) {
+              playSound('point', updatedBoard.overlay?.soundVolume ?? 0.6);
             }
           }
 
@@ -108,7 +110,11 @@ export const OBSOverlayView: React.FC<OBSOverlayViewProps> = ({ boardId: propBoa
         }
       },
       (soundType, volume) => {
-        playSound(soundType as any, volume);
+        const soundActive = !route.isMuted && board?.overlay?.soundEnabled !== false && (board?.overlay?.soundVolume ?? 0.7) > 0;
+        if (soundActive) {
+          const effectiveVol = typeof board?.overlay?.soundVolume === 'number' ? board.overlay.soundVolume : (volume || 0.6);
+          playSound(soundType as any, effectiveVol);
+        }
         if (soundType === 'fanfare' || soundType === 'goal') {
           setShowConfetti(true);
         }
@@ -119,7 +125,7 @@ export const OBSOverlayView: React.FC<OBSOverlayViewProps> = ({ boardId: propBoa
     return () => {
       cleanupRealtime();
     };
-  }, [boardId, lastHomeScore, lastAwayScore]);
+  }, [boardId, lastHomeScore, lastAwayScore, route.isMuted, board?.overlay?.soundEnabled, board?.overlay?.soundVolume]);
 
   // Also listen to local BroadcastChannel & storage events for same-browser multi-tab previews
   useEffect(() => {
@@ -133,18 +139,20 @@ export const OBSOverlayView: React.FC<OBSOverlayViewProps> = ({ boardId: propBoa
           setBoard(updated);
           setIsConnected(true);
 
+          const soundActive = !route.isMuted && updated.overlay?.soundEnabled !== false && (updated.overlay?.soundVolume ?? 0.7) > 0;
+
           if (lastHomeScore !== null && updated.homeTeam.score > lastHomeScore) {
             setHomeScoreAnimated(true);
             setTimeout(() => setHomeScoreAnimated(false), 900);
-            if (updated.overlay?.soundEnabled) {
-              playSound('point', updated.overlay.soundVolume || 0.6);
+            if (soundActive) {
+              playSound('point', updated.overlay?.soundVolume ?? 0.6);
             }
           }
           if (lastAwayScore !== null && updated.awayTeam.score > lastAwayScore) {
             setAwayScoreAnimated(true);
             setTimeout(() => setAwayScoreAnimated(false), 900);
-            if (updated.overlay?.soundEnabled) {
-              playSound('point', updated.overlay.soundVolume || 0.6);
+            if (soundActive) {
+              playSound('point', updated.overlay?.soundVolume ?? 0.6);
             }
           }
 
@@ -153,7 +161,11 @@ export const OBSOverlayView: React.FC<OBSOverlayViewProps> = ({ boardId: propBoa
         }
       } else if (event.data?.type === 'PLAY_SOUND') {
         if (!event.data.boardId || event.data.boardId === boardId) {
-          playSound(event.data.soundType, event.data.volume || 0.6);
+          const soundActive = !route.isMuted && board?.overlay?.soundEnabled !== false && (board?.overlay?.soundVolume ?? 0.7) > 0;
+          if (soundActive) {
+            const effectiveVol = typeof board?.overlay?.soundVolume === 'number' ? board.overlay.soundVolume : (event.data.volume || 0.6);
+            playSound(event.data.soundType, effectiveVol);
+          }
           if (event.data.soundType === 'fanfare' || event.data.soundType === 'goal') {
             setShowConfetti(true);
           }

@@ -6,36 +6,40 @@ export interface ParsedRoute {
   isOverlay: boolean;
   boardId: string | null;
   compressedData: string | null;
+  isMuted: boolean;
 }
 
 /**
  * Returns the canonical, unique URL for an OBS Browser Source overlay
  * e.g. https://.../?mode=overlay&id=sb_soccer_123
  */
-export function getOverlayUrl(boardId: string): string {
+export function getOverlayUrl(boardId: string, options?: { muted?: boolean }): string {
   if (typeof window === 'undefined') return '';
   const origin = window.location.origin;
-  return `${origin}/?mode=overlay&id=${encodeURIComponent(boardId)}`;
+  const muteSuffix = options?.muted ? '&mute=1' : '';
+  return `${origin}/?mode=overlay&id=${encodeURIComponent(boardId)}${muteSuffix}`;
 }
 
 /**
  * Returns an alternative direct overlay URL
  * e.g. https://.../?overlay=sb_soccer_123
  */
-export function getDirectOverlayUrl(boardId: string): string {
+export function getDirectOverlayUrl(boardId: string, options?: { muted?: boolean }): string {
   if (typeof window === 'undefined') return '';
   const origin = window.location.origin;
-  return `${origin}/?overlay=${encodeURIComponent(boardId)}`;
+  const muteSuffix = options?.muted ? '&mute=1' : '';
+  return `${origin}/?overlay=${encodeURIComponent(boardId)}${muteSuffix}`;
 }
 
 /**
  * Returns a hash-based overlay URL (useful for strict static hosts or subpaths)
  * e.g. https://.../#/overlay/sb_soccer_123
  */
-export function getHashOverlayUrl(boardId: string): string {
+export function getHashOverlayUrl(boardId: string, options?: { muted?: boolean }): string {
   if (typeof window === 'undefined') return '';
   const origin = window.location.origin;
-  return `${origin}/#/overlay/${encodeURIComponent(boardId)}`;
+  const muteSuffix = options?.muted ? '?mute=1' : '';
+  return `${origin}/#/overlay/${encodeURIComponent(boardId)}${muteSuffix}`;
 }
 
 /**
@@ -44,7 +48,7 @@ export function getHashOverlayUrl(boardId: string): string {
  */
 export function parseCurrentRoute(): ParsedRoute {
   if (typeof window === 'undefined') {
-    return { isOverlay: false, boardId: null, compressedData: null };
+    return { isOverlay: false, boardId: null, compressedData: null, isMuted: false };
   }
 
   const searchParams = new URLSearchParams(window.location.search);
@@ -52,6 +56,18 @@ export function parseCurrentRoute(): ParsedRoute {
   const overlayParam = searchParams.get('overlay');
   const idParam = searchParams.get('id');
   const dataParam = searchParams.get('data');
+  const muteParam = searchParams.get('mute');
+  const soundParam = searchParams.get('sound');
+  const audioParam = searchParams.get('audio');
+
+  const isMuted = 
+    muteParam === '1' || 
+    muteParam === 'true' || 
+    soundParam === '0' || 
+    soundParam === 'false' || 
+    audioParam === '0' || 
+    audioParam === 'false' ||
+    audioParam === 'off';
 
   // Format 1: ?mode=overlay&id=XYZ
   if (modeParam === 'overlay') {
@@ -59,6 +75,7 @@ export function parseCurrentRoute(): ParsedRoute {
       isOverlay: true,
       boardId: idParam || (overlayParam && overlayParam !== 'true' ? overlayParam : null),
       compressedData: dataParam,
+      isMuted,
     };
   }
 
@@ -68,6 +85,7 @@ export function parseCurrentRoute(): ParsedRoute {
       isOverlay: true,
       boardId: overlayParam,
       compressedData: dataParam,
+      isMuted,
     };
   }
 
@@ -77,6 +95,7 @@ export function parseCurrentRoute(): ParsedRoute {
       isOverlay: true,
       boardId: idParam,
       compressedData: dataParam,
+      isMuted,
     };
   }
 
@@ -89,6 +108,7 @@ export function parseCurrentRoute(): ParsedRoute {
         isOverlay: true,
         boardId: decodeURIComponent(extractedId),
         compressedData: dataParam,
+        isMuted,
       };
     }
   }
@@ -100,6 +120,7 @@ export function parseCurrentRoute(): ParsedRoute {
       isOverlay: true,
       boardId: decodeURIComponent(extractedId),
       compressedData: dataParam,
+      isMuted,
     };
   }
 
@@ -107,5 +128,6 @@ export function parseCurrentRoute(): ParsedRoute {
     isOverlay: false,
     boardId: idParam,
     compressedData: dataParam,
+    isMuted,
   };
 }

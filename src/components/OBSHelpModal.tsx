@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Copy, Check, Tv, ExternalLink, X, Monitor, ShieldCheck, Zap, Wifi, Layers } from 'lucide-react';
+import { Copy, Check, Tv, ExternalLink, X, Monitor, ShieldCheck, Zap, Wifi, Layers, VolumeX } from 'lucide-react';
 import { getBoardById, loadAllBoards } from '../utils/storage';
 import { encodeBoardToUrlParam } from '../utils/realtimeSync';
 import { getOverlayUrl } from '../utils/urlHelper';
@@ -16,6 +16,7 @@ export const OBSHelpModal: React.FC<OBSHelpModalProps> = ({ isOpen, onClose, boa
   const [allBoards, setAllBoards] = useState<ScoreboardData[]>([]);
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [copiedDataUrl, setCopiedDataUrl] = useState(false);
+  const [copiedMutedUrl, setCopiedMutedUrl] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -33,6 +34,7 @@ export const OBSHelpModal: React.FC<OBSHelpModalProps> = ({ isOpen, onClose, boa
 
   const currentBoard = selectedId ? getBoardById(selectedId) || allBoards.find(b => b.id === selectedId) : null;
   const overlayUrl = selectedId ? getOverlayUrl(selectedId) : '';
+  const mutedOverlayUrl = selectedId ? getOverlayUrl(selectedId, { muted: true }) : '';
   const compressedData = currentBoard ? encodeBoardToUrlParam(currentBoard) : '';
   const instantDataUrl = selectedId && compressedData
     ? `${overlayUrl}&data=${compressedData}`
@@ -50,6 +52,13 @@ export const OBSHelpModal: React.FC<OBSHelpModalProps> = ({ isOpen, onClose, boa
     navigator.clipboard.writeText(instantDataUrl);
     setCopiedDataUrl(true);
     setTimeout(() => setCopiedDataUrl(false), 2500);
+  };
+
+  const handleCopyMutedUrl = () => {
+    if (!mutedOverlayUrl) return;
+    navigator.clipboard.writeText(mutedOverlayUrl);
+    setCopiedMutedUrl(true);
+    setTimeout(() => setCopiedMutedUrl(false), 2500);
   };
 
   return (
@@ -127,19 +136,35 @@ export const OBSHelpModal: React.FC<OBSHelpModalProps> = ({ isOpen, onClose, boa
               Esta URL sincroniza en tiempo real mediante Cloud KV + MQTT Retained con el marcador <span className="text-white font-semibold">"{currentBoard?.title || 'Seleccionado'}"</span>.
             </p>
 
-            {/* Alternative Ultra-Safe Embed URL */}
-            <div className="pt-2 border-t border-indigo-900/40 flex items-center justify-between">
-              <div>
-                <p className="text-[11px] font-semibold text-indigo-300">¿Quieres respaldo 100% offline con datos incluidos?</p>
-                <p className="text-[10px] text-slate-400">Copia la URL con el diseño y nombres integrados directamente en el enlace</p>
+            {/* Alternative URLs (Offline with Data & Muted without sound) */}
+            <div className="pt-2 border-t border-indigo-900/40 space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] font-semibold text-indigo-300">¿Quieres respaldo 100% offline con datos incluidos?</p>
+                  <p className="text-[10px] text-slate-400">Copia la URL con el diseño y nombres integrados directamente en el enlace</p>
+                </div>
+                <button
+                  onClick={handleCopyDataUrl}
+                  className="flex shrink-0 items-center gap-1 rounded-lg border border-indigo-700/60 bg-indigo-950/60 hover:bg-indigo-900/60 px-3 py-1.5 text-[11px] font-semibold text-indigo-200 transition-all"
+                >
+                  {copiedDataUrl ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                  {copiedDataUrl ? '¡Copiada!' : 'Copiar con Datos'}
+                </button>
               </div>
-              <button
-                onClick={handleCopyDataUrl}
-                className="flex shrink-0 items-center gap-1 rounded-lg border border-indigo-700/60 bg-indigo-950/60 hover:bg-indigo-900/60 px-3 py-1.5 text-[11px] font-semibold text-indigo-200 transition-all"
-              >
-                {copiedDataUrl ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
-                {copiedDataUrl ? '¡Copiada!' : 'Copiar URL con Datos'}
-              </button>
+
+              <div className="flex items-center justify-between pt-1 border-t border-indigo-950">
+                <div>
+                  <p className="text-[11px] font-semibold text-rose-300">¿Quieres el overlay sin ningún tipo de sonido?</p>
+                  <p className="text-[10px] text-slate-400">Copia la URL con parámetro de silencio automático (&mute=1)</p>
+                </div>
+                <button
+                  onClick={handleCopyMutedUrl}
+                  className="flex shrink-0 items-center gap-1 rounded-lg border border-rose-900/50 bg-rose-950/40 hover:bg-rose-900/60 px-3 py-1.5 text-[11px] font-semibold text-rose-200 transition-all"
+                >
+                  {copiedMutedUrl ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <VolumeX className="h-3.5 w-3.5" />}
+                  {copiedMutedUrl ? '¡Copiada!' : 'Copiar URL Silenciada'}
+                </button>
+              </div>
             </div>
           </div>
 

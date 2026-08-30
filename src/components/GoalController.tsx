@@ -14,7 +14,9 @@ import {
   Tv,
   Sparkles,
   CheckCircle2,
-  Save
+  Save,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 import { ConfettiEffect } from './ConfettiEffect';
 
@@ -34,6 +36,25 @@ export const GoalController: React.FC<GoalControllerProps> = ({
   const [showConfetti, setShowConfetti] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveToastMessage, setSaveToastMessage] = useState<string | null>(null);
+
+  const isMuted = !board.overlay.soundEnabled || (board.overlay.soundVolume ?? 0.7) === 0;
+
+  const toggleSoundMute = () => {
+    const nextState = isMuted;
+    updateBoard((prev) => ({
+      ...prev,
+      overlay: {
+        ...prev.overlay,
+        soundEnabled: nextState,
+        soundVolume: nextState && (prev.overlay.soundVolume || 0) === 0 ? 0.7 : prev.overlay.soundVolume,
+      },
+    }));
+    setSaveToastMessage(nextState ? '🔊 Sonido activado' : '🔇 Sonido silenciado (Mute)');
+    setTimeout(() => setSaveToastMessage(null), 2500);
+    if (nextState) {
+      playSound('click', 0.4);
+    }
+  };
 
   // Cloud Realtime sync
   useEffect(() => {
@@ -79,10 +100,12 @@ export const GoalController: React.FC<GoalControllerProps> = ({
       const newCurrent = Math.max(0, g.current + delta);
       if (newCurrent >= g.target && g.current < g.target) {
         setShowConfetti(true);
-        playSound('fanfare', 0.7);
-        broadcastTriggerSound('fanfare', 0.7);
-      } else if (delta > 0) {
-        playSound('point', 0.5);
+        if (!isMuted) {
+          playSound('fanfare', board.overlay.soundVolume || 0.7);
+          broadcastTriggerSound('fanfare', board.overlay.soundVolume || 0.7);
+        }
+      } else if (delta > 0 && !isMuted) {
+        playSound('point', board.overlay.soundVolume || 0.5);
       }
       return {
         ...prev,
@@ -136,6 +159,29 @@ export const GoalController: React.FC<GoalControllerProps> = ({
           </div>
 
           <div className="flex items-center gap-2.5">
+            {/* Quick Audio Mute Toggle */}
+            <button
+              onClick={toggleSoundMute}
+              className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold transition-all active:scale-95 cursor-pointer ${
+                !isMuted
+                  ? 'border-emerald-500/50 bg-emerald-950/40 text-emerald-300 hover:bg-emerald-900/50'
+                  : 'border-rose-800/60 bg-rose-950/50 text-rose-300 hover:bg-rose-900/60'
+              }`}
+              title={!isMuted ? '🔊 Sonido Activado: Clic para silenciar (Mute)' : '🔇 Sonido Silenciado: Clic para activar'}
+            >
+              {!isMuted ? (
+                <>
+                  <Volume2 className="h-3.5 w-3.5 text-emerald-400" />
+                  <span className="hidden sm:inline">Sonido ON</span>
+                </>
+              ) : (
+                <>
+                  <VolumeX className="h-3.5 w-3.5 text-rose-400" />
+                  <span className="hidden sm:inline">Silenciado</span>
+                </>
+              )}
+            </button>
+
             <button
               onClick={handleExplicitSave}
               disabled={isSaving}
