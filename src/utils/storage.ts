@@ -1,6 +1,7 @@
 import { ScoreboardData } from '../types';
 import { createNewBoard } from './presets';
 import { publishBoardUpdate, publishSound } from './realtimeSync';
+import { syncBoardToCloud } from './cloudStorage';
 
 const STORAGE_KEY = 'scoreboard_studio_boards_v1';
 const SINGLE_BOARD_PREFIX = 'scoreboard_board_';
@@ -281,7 +282,10 @@ export function saveBoard(
   // 3. Persist to IndexedDB permanently
   persistToIndexedDB(updatedBoard);
 
-  // 4. Broadcast live updates to OBS Browser Source and local tabs
+  // 4. Persist to Cloud Key-Value Storage
+  syncBoardToCloud(updatedBoard);
+
+  // 5. Broadcast live updates to OBS Browser Source and local tabs
   if (!options.skipBroadcast) {
     broadcastBoardUpdate(updatedBoard);
   }

@@ -124,8 +124,23 @@ export const OBSHelpModal: React.FC<OBSHelpModalProps> = ({ isOpen, onClose, boa
               </button>
             </div>
             <p className="text-[11px] text-slate-400">
-              Esta URL apunta exclusivamente al marcador <span className="text-white font-semibold">"{currentBoard?.title || 'Seleccionado'}"</span>. No interferirá con otros overlays en tu OBS.
+              Esta URL sincroniza en tiempo real mediante Cloud KV + MQTT Retained con el marcador <span className="text-white font-semibold">"{currentBoard?.title || 'Seleccionado'}"</span>.
             </p>
+
+            {/* Alternative Ultra-Safe Embed URL */}
+            <div className="pt-2 border-t border-indigo-900/40 flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-semibold text-indigo-300">¿Quieres respaldo 100% offline con datos incluidos?</p>
+                <p className="text-[10px] text-slate-400">Copia la URL con el diseño y nombres integrados directamente en el enlace</p>
+              </div>
+              <button
+                onClick={handleCopyDataUrl}
+                className="flex shrink-0 items-center gap-1 rounded-lg border border-indigo-700/60 bg-indigo-950/60 hover:bg-indigo-900/60 px-3 py-1.5 text-[11px] font-semibold text-indigo-200 transition-all"
+              >
+                {copiedDataUrl ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                {copiedDataUrl ? '¡Copiada!' : 'Copiar URL con Datos'}
+              </button>
+            </div>
           </div>
 
           {/* Steps */}

@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { ScoreboardData, OverlayLayout } from '../types';
 import { getBoardById, getSyncChannel, saveBoard, loadAllBoards } from '../utils/storage';
 import { initRealtimeSync, decodeBoardFromUrlParam } from '../utils/realtimeSync';
+import { fetchBoardFromCloud } from '../utils/cloudStorage';
 import { parseCurrentRoute, getOverlayUrl } from '../utils/urlHelper';
 import { createNewBoard } from '../utils/presets';
 import { playSound } from '../utils/audio';
@@ -29,13 +30,16 @@ export const OBSOverlayView: React.FC<OBSOverlayViewProps> = ({ boardId: propBoa
   const boardId = propBoardId || route.boardId || undefined;
   const dataParam = route.compressedData;
 
-  // Load board initially (from URL data, localStorage, or fallback)
+  // Load board initially (from URL data, localStorage, Cloud KV or fallback)
   useEffect(() => {
     let initialBoard: ScoreboardData | null = null;
 
     // 1. Try URL encoded data if provided
     if (dataParam) {
       initialBoard = decodeBoardFromUrlParam(dataParam);
+      if (initialBoard) {
+        saveBoard(initialBoard, { skipBroadcast: true });
+      }
     }
 
     // 2. Try localStorage by ID
@@ -43,17 +47,28 @@ export const OBSOverlayView: React.FC<OBSOverlayViewProps> = ({ boardId: propBoa
       initialBoard = getBoardById(boardId);
     }
 
-    // 3. Fallback: if not found by specific ID, create a clean in-memory placeholder without altering localStorage
-    if (!initialBoard && boardId) {
-      initialBoard = createNewBoard('sports_match', 'soccer', 'Marcador en Vivo');
-      initialBoard.id = boardId;
-      // Do not write to localStorage until received from active controller
-    }
-
     if (initialBoard) {
       setBoard(initialBoard);
       setLastHomeScore(initialBoard.homeTeam.score);
       setLastAwayScore(initialBoard.awayTeam.score);
+    } else if (boardId) {
+      // 3. Try Cloud KV fetch asynchronously
+      fetchBoardFromCloud(boardId).then((cloudBoard) => {
+        if (cloudBoard) {
+          setBoard(cloudBoard);
+          setLastHomeScore(cloudBoard.homeTeam.score);
+          setLastAwayScore(cloudBoard.awayTeam.score);
+          saveBoard(cloudBoard, { skipBroadcast: true });
+        } else {
+          // If still not found after cloud check, use clean in-memory fallback
+          setBoard((curr) => {
+            if (curr) return curr;
+            const fallback = createNewBoard('sports_match', 'soccer', 'Marcador en Vivo');
+            fallback.id = boardId;
+            return fallback;
+          });
+        }
+      });
     } else {
       // If no board selected, load list so user can choose or view links
       const all = loadAllBoards();
