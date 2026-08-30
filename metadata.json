@@ -1,0 +1,6 @@
+{
+  "name": "ScoreBoard Studio - KeepTheScore para OBS",
+  "description": "Clon de KeepTheScore para crear y controlar marcadores y screen boards en tiempo real para OBS Studio, Twitch, YouTube y transmisiones en vivo.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
