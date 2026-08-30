@@ -4,8 +4,9 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { ScoreboardData, ActiveView } from './types';
+import { ScoreboardData } from './types';
 import { loadAllBoards, getBoardById } from './utils/storage';
+import { parseCurrentRoute } from './utils/urlHelper';
 import { Navbar } from './components/Navbar';
 import { DashboardHome } from './components/DashboardHome';
 import { BoardController } from './components/BoardController';
@@ -22,26 +23,35 @@ export default function App() {
   const [obsHelpModalOpen, setObsHelpModalOpen] = useState<boolean>(false);
   const [helpBoardId, setHelpBoardId] = useState<string | undefined>(undefined);
 
-  // Initialize & parse query params (for OBS browser source)
+  // Initialize & parse route (supporting query param ?mode=overlay&id=XYZ, ?overlay=XYZ, #/overlay/XYZ, /overlay/XYZ)
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const mode = params.get('mode');
-    const isOverlay = mode === 'overlay' || params.get('overlay') === 'true';
-    const idFromUrl = params.get('id');
+    const handleRouteCheck = () => {
+      const route = parseCurrentRoute();
+      if (route.isOverlay) {
+        setIsOverlayMode(true);
+        if (route.boardId) {
+          setSelectedBoardId(route.boardId);
+        }
+      } else {
+        setIsOverlayMode(false);
+        const all = loadAllBoards();
+        setBoards(all);
+        if (route.boardId) {
+          const found = all.find((b) => b.id === route.boardId);
+          if (found) setSelectedBoardId(route.boardId);
+        }
+      }
+    };
 
-    if (isOverlay) {
-      setIsOverlayMode(true);
-      if (idFromUrl) {
-        setSelectedBoardId(idFromUrl);
-      }
-    } else {
-      const all = loadAllBoards();
-      setBoards(all);
-      if (idFromUrl) {
-        const found = all.find((b) => b.id === idFromUrl);
-        if (found) setSelectedBoardId(idFromUrl);
-      }
-    }
+    handleRouteCheck();
+
+    window.addEventListener('popstate', handleRouteCheck);
+    window.addEventListener('hashchange', handleRouteCheck);
+
+    return () => {
+      window.removeEventListener('popstate', handleRouteCheck);
+      window.removeEventListener('hashchange', handleRouteCheck);
+    };
   }, []);
 
   const refreshBoards = () => {
@@ -50,7 +60,6 @@ export default function App() {
   };
 
   const handleSelectBoard = (board: ScoreboardData) => {
-    // Ensure boards state is refreshed immediately
     const all = loadAllBoards();
     setBoards(all);
     setSelectedBoardId(board.id);
@@ -61,20 +70,8 @@ export default function App() {
     refreshBoards();
   };
 
-  const handleUpdateActiveBoard = (updated: ScoreboardData) => {
-    setBoards((prev) => {
-      const idx = prev.findIndex((b) => b.id === updated.id);
-      if (idx >= 0) {
-        const next = [...prev];
-        next[idx] = updated;
-        return next;
-      }
-      return [updated, ...prev];
-    });
-  };
-
   const handleOpenObsHelp = (boardId?: string) => {
-    setHelpBoardId(boardId || selectedBoardId || (boards[0]?.id));
+    setHelpBoardId(boardId || selectedBoardId || boards[0]?.id);
     setObsHelpModalOpen(true);
   };
 

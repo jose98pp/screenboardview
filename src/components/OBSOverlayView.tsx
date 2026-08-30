@@ -2,10 +2,11 @@ import React, { useEffect, useState, useRef } from 'react';
 import { ScoreboardData, OverlayLayout } from '../types';
 import { getBoardById, getSyncChannel, saveBoard, loadAllBoards } from '../utils/storage';
 import { initRealtimeSync, decodeBoardFromUrlParam } from '../utils/realtimeSync';
+import { parseCurrentRoute, getOverlayUrl } from '../utils/urlHelper';
 import { createNewBoard } from '../utils/presets';
 import { playSound } from '../utils/audio';
 import { ConfettiEffect } from './ConfettiEffect';
-import { Trophy, Clock, Flame, ChevronRight, Shield, Bell, Wifi } from 'lucide-react';
+import { Trophy, Clock, Flame, ChevronRight, Shield, Bell, Wifi, ExternalLink, Check, Copy } from 'lucide-react';
 
 interface OBSOverlayViewProps {
   boardId?: string;
@@ -19,13 +20,14 @@ export const OBSOverlayView: React.FC<OBSOverlayViewProps> = ({ boardId: propBoa
   const [homeScoreAnimated, setHomeScoreAnimated] = useState(false);
   const [awayScoreAnimated, setAwayScoreAnimated] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const [availableBoards, setAvailableBoards] = useState<ScoreboardData[]>([]);
 
   const timerRef = useRef<number | null>(null);
 
-  // Extract ID and data payload from URL
-  const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-  const boardId = propBoardId || urlParams?.get('id') || undefined;
-  const dataParam = urlParams?.get('data');
+  // Extract ID and data payload from URL helper
+  const route = typeof window !== 'undefined' ? parseCurrentRoute() : { isOverlay: true, boardId: null, compressedData: null };
+  const boardId = propBoardId || route.boardId || undefined;
+  const dataParam = route.compressedData;
 
   // Load board initially (from URL data, localStorage, or fallback)
   useEffect(() => {
@@ -52,6 +54,10 @@ export const OBSOverlayView: React.FC<OBSOverlayViewProps> = ({ boardId: propBoa
       setBoard(initialBoard);
       setLastHomeScore(initialBoard.homeTeam.score);
       setLastAwayScore(initialBoard.awayTeam.score);
+    } else {
+      // If no board selected, load list so user can choose or view links
+      const all = loadAllBoards();
+      setAvailableBoards(all);
     }
   }, [boardId, dataParam]);
 
@@ -62,27 +68,29 @@ export const OBSOverlayView: React.FC<OBSOverlayViewProps> = ({ boardId: propBoa
     const cleanupRealtime = initRealtimeSync(
       boardId,
       (updatedBoard) => {
-        setIsConnected(true);
-        setBoard(updatedBoard);
+        if (updatedBoard.id === boardId) {
+          setIsConnected(true);
+          setBoard(updatedBoard);
 
-        // Detect score changes for animations & sound
-        if (lastHomeScore !== null && updatedBoard.homeTeam.score > lastHomeScore) {
-          setHomeScoreAnimated(true);
-          setTimeout(() => setHomeScoreAnimated(false), 900);
-          if (updatedBoard.overlay?.soundEnabled) {
-            playSound('point', updatedBoard.overlay.soundVolume || 0.6);
+          // Detect score changes for animations & sound
+          if (lastHomeScore !== null && updatedBoard.homeTeam.score > lastHomeScore) {
+            setHomeScoreAnimated(true);
+            setTimeout(() => setHomeScoreAnimated(false), 900);
+            if (updatedBoard.overlay?.soundEnabled) {
+              playSound('point', updatedBoard.overlay.soundVolume || 0.6);
+            }
           }
-        }
-        if (lastAwayScore !== null && updatedBoard.awayTeam.score > lastAwayScore) {
-          setAwayScoreAnimated(true);
-          setTimeout(() => setAwayScoreAnimated(false), 900);
-          if (updatedBoard.overlay?.soundEnabled) {
-            playSound('point', updatedBoard.overlay.soundVolume || 0.6);
+          if (lastAwayScore !== null && updatedBoard.awayTeam.score > lastAwayScore) {
+            setAwayScoreAnimated(true);
+            setTimeout(() => setAwayScoreAnimated(false), 900);
+            if (updatedBoard.overlay?.soundEnabled) {
+              playSound('point', updatedBoard.overlay.soundVolume || 0.6);
+            }
           }
-        }
 
-        setLastHomeScore(updatedBoard.homeTeam.score);
-        setLastAwayScore(updatedBoard.awayTeam.score);
+          setLastHomeScore(updatedBoard.homeTeam.score);
+          setLastAwayScore(updatedBoard.awayTeam.score);
+        }
       },
       (soundType, volume) => {
         playSound(soundType as any, volume);
@@ -104,7 +112,8 @@ export const OBSOverlayView: React.FC<OBSOverlayViewProps> = ({ boardId: propBoa
 
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'BOARD_UPDATED' && event.data.board) {
-        if (!boardId || event.data.boardId === boardId) {
+        // STRICT ID MATCH: only accept messages meant for this specific boardId
+        if (boardId && (event.data.boardId === boardId || event.data.board?.id === boardId)) {
           const updated: ScoreboardData = event.data.board;
           setBoard(updated);
           setIsConnected(true);
@@ -128,15 +137,17 @@ export const OBSOverlayView: React.FC<OBSOverlayViewProps> = ({ boardId: propBoa
           setLastAwayScore(updated.awayTeam.score);
         }
       } else if (event.data?.type === 'PLAY_SOUND') {
-        playSound(event.data.soundType, event.data.volume || 0.6);
-        if (event.data.soundType === 'fanfare' || event.data.soundType === 'goal') {
-          setShowConfetti(true);
+        if (!event.data.boardId || event.data.boardId === boardId) {
+          playSound(event.data.soundType, event.data.volume || 0.6);
+          if (event.data.soundType === 'fanfare' || event.data.soundType === 'goal') {
+            setShowConfetti(true);
+          }
         }
       }
     };
 
     const handleStorage = (e: StorageEvent) => {
-      if (e.key === 'scoreboard_studio_boards_v1' && boardId) {
+      if (boardId && (e.key === `scoreboard_board_${boardId}` || e.key === 'scoreboard_studio_boards_v1')) {
         const fresh = getBoardById(boardId);
         if (fresh) {
           setBoard(fresh);
@@ -195,12 +206,49 @@ export const OBSOverlayView: React.FC<OBSOverlayViewProps> = ({ boardId: propBoa
 
   if (!board) {
     return (
-      <div className="flex h-screen w-screen items-center justify-center p-6 text-center font-sans text-slate-400 bg-transparent">
-        <div className="rounded-xl border border-slate-700 bg-slate-900/90 p-6 shadow-2xl backdrop-blur-md max-w-md">
-          <p className="text-base font-bold text-white mb-2">Marcador OBS Listo</p>
-          <p className="text-xs text-slate-300">
-            Esperando conexión con el panel de control o identificador de marcador.
+      <div className="flex min-h-screen w-screen items-center justify-center p-6 text-center font-sans text-slate-400 bg-slate-950/90">
+        <div className="rounded-2xl border border-slate-700 bg-slate-900/95 p-6 shadow-2xl backdrop-blur-md max-w-lg w-full text-left space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="h-3 w-3 rounded-full bg-indigo-500 animate-pulse" />
+              <h2 className="text-base font-bold text-white">Selecciona tu Marcador para OBS</h2>
+            </div>
+            <span className="text-[10px] bg-indigo-950 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full font-mono">
+              OBS Studio
+            </span>
+          </div>
+
+          <p className="text-xs text-slate-300 leading-relaxed">
+            Cada marcador tiene una <strong>URL única e independiente</strong> para evitar conflictos o cambios accidentales en tu transmisión. Selecciona el marcador que deseas proyectar:
           </p>
+
+          {availableBoards.length > 0 ? (
+            <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+              {availableBoards.map((b) => (
+                <a
+                  key={b.id}
+                  href={getOverlayUrl(b.id)}
+                  className="flex items-center justify-between p-3 rounded-xl border border-slate-800 bg-slate-950/80 hover:border-indigo-500 hover:bg-indigo-950/30 transition-all text-xs group"
+                >
+                  <div className="flex flex-col">
+                    <span className="font-bold text-slate-200 group-hover:text-white">{b.title}</span>
+                    <span className="text-[10px] font-mono text-slate-500">ID: {b.id}</span>
+                  </div>
+                  <span className="text-[11px] text-indigo-400 font-bold flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+                    Abrir Overlay <ChevronRight className="h-3.5 w-3.5" />
+                  </span>
+                </a>
+              ))}
+            </div>
+          ) : (
+            <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-400 text-center">
+              Esperando conexión con el panel de control o identificador de marcador en la URL.
+            </div>
+          )}
+
+          <div className="text-[11px] text-slate-500 border-t border-slate-800/80 pt-3">
+            Formato recomendado para OBS: <code className="text-indigo-300 bg-slate-950 px-1 py-0.5 rounded font-mono">/?mode=overlay&id=[ID_MARCADOR]</code>
+          </div>
         </div>
       </div>
     );

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ScoreboardData, PlayerScore } from '../types';
 import { saveBoard, broadcastTriggerSound } from '../utils/storage';
 import { initRealtimeSync, publishBoardUpdate } from '../utils/realtimeSync';
+import { getOverlayUrl } from '../utils/urlHelper';
 import { playSound } from '../utils/audio';
 import {
   Trophy,
@@ -106,7 +107,7 @@ export const LeaderboardController: React.FC<LeaderboardControllerProps> = ({
     broadcastTriggerSound('fanfare', 0.7);
   };
 
-  const overlayUrl = `${window.location.origin}/?mode=overlay&id=${board.id}`;
+  const overlayUrl = getOverlayUrl(board.id);
 
   const copyObsUrl = () => {
     navigator.clipboard.writeText(overlayUrl);

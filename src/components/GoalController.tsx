@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ScoreboardData } from '../types';
 import { saveBoard, broadcastTriggerSound } from '../utils/storage';
 import { initRealtimeSync, publishBoardUpdate } from '../utils/realtimeSync';
+import { getOverlayUrl } from '../utils/urlHelper';
 import { playSound } from '../utils/audio';
 import {
   Target,
@@ -75,7 +76,7 @@ export const GoalController: React.FC<GoalControllerProps> = ({
     });
   };
 
-  const overlayUrl = `${window.location.origin}/?mode=overlay&id=${board.id}`;
+  const overlayUrl = getOverlayUrl(board.id);
 
   const copyObsUrl = () => {
     navigator.clipboard.writeText(overlayUrl);

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ScoreboardData, BoardType, SportPreset } from '../types';
 import { QUICK_TEMPLATES, createNewBoard } from '../utils/presets';
+import { getOverlayUrl } from '../utils/urlHelper';
 import {
   saveBoard,
   deleteBoard,
@@ -125,7 +126,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 
   const handleCopyObsUrl = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    const url = `${window.location.origin}/?mode=overlay&id=${id}`;
+    const url = getOverlayUrl(id);
     navigator.clipboard.writeText(url);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2500);
@@ -445,7 +446,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 
                     {/* Open Overlay in new tab */}
                     <a
-                      href={`${window.location.origin}/?mode=overlay&id=${b.id}`}
+                      href={getOverlayUrl(b.id)}
                       target="_blank"
                       rel="noreferrer"
                       onClick={(e) => e.stopPropagation()}

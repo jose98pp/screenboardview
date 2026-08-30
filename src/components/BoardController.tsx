@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ScoreboardData, OverlayLayout, FontFamilyChoice, OverlayBackground } from '../types';
 import { saveBoard, broadcastTriggerSound, duplicateBoard, exportSingleBoardToJson } from '../utils/storage';
 import { initRealtimeSync, publishBoardUpdate, encodeBoardToUrlParam } from '../utils/realtimeSync';
+import { getOverlayUrl } from '../utils/urlHelper';
 import { playSound } from '../utils/audio';
 import { compressImageFile } from '../utils/imageCompressor';
 import { POPULAR_TEAMS_PRESETS, COMPETITION_PRESETS } from '../data/teamPresets';
@@ -351,7 +352,7 @@ export const BoardController: React.FC<BoardControllerProps> = ({
     }
   };
 
-  const overlayUrl = `${window.location.origin}/?mode=overlay&id=${board.id}`;
+  const overlayUrl = getOverlayUrl(board.id);
 
   const copyObsUrl = () => {
     navigator.clipboard.writeText(overlayUrl);
@@ -865,17 +866,43 @@ export const BoardController: React.FC<BoardControllerProps> = ({
 
               {/* OBS Overlay Bento Block */}
               <div className="md:col-span-4 bg-slate-900 border border-slate-800 rounded-3xl p-6 flex flex-col justify-between">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center border border-slate-700 text-indigo-400 font-bold text-xs">
-                    OBS
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center border border-slate-700 text-indigo-400 font-bold text-xs">
+                        OBS
+                      </div>
+                      <div>
+                        <div className="text-white font-bold text-sm">URL Única de Overlay</div>
+                        <div className="text-xs text-slate-500">Transparencia nativa & 60 FPS</div>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-mono text-indigo-400 bg-indigo-950 border border-indigo-500/30 px-2 py-0.5 rounded-full">
+                      ID: {board.id}
+                    </span>
                   </div>
-                  <div>
-                    <div className="text-white font-bold text-sm">Navegador OBS URL</div>
-                    <div className="text-xs text-slate-500">Transparencia y 60 FPS</div>
+                  <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 font-mono text-[11px] text-indigo-300 truncate select-all">
+                    {overlayUrl}
                   </div>
                 </div>
-                <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 font-mono text-xs text-indigo-400 truncate select-all">
-                  {overlayUrl}
+
+                <div className="mt-4 flex items-center gap-2">
+                  <button
+                    onClick={copyObsUrl}
+                    className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 py-2 px-3 text-xs font-bold text-white transition-all active:scale-95 shadow-md shadow-indigo-900/30"
+                  >
+                    {copiedUrl ? <Check className="h-3.5 w-3.5 text-emerald-300" /> : <Copy className="h-3.5 w-3.5" />}
+                    {copiedUrl ? '¡URL Copiada!' : 'Copiar URL para OBS'}
+                  </button>
+                  <a
+                    href={overlayUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="p-2 rounded-xl border border-slate-800 bg-slate-950 text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
+                    title="Probar en nueva pestaña"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                  </a>
                 </div>
               </div>
             </div>

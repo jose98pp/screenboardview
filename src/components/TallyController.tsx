@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ScoreboardData, TallyItem } from '../types';
 import { saveBoard } from '../utils/storage';
 import { initRealtimeSync, publishBoardUpdate } from '../utils/realtimeSync';
+import { getOverlayUrl } from '../utils/urlHelper';
 import { playSound } from '../utils/audio';
 import {
   Hash,
@@ -81,7 +82,7 @@ export const TallyController: React.FC<TallyControllerProps> = ({
     }));
   };
 
-  const overlayUrl = `${window.location.origin}/?mode=overlay&id=${board.id}`;
+  const overlayUrl = getOverlayUrl(board.id);
 
   const copyObsUrl = () => {
     navigator.clipboard.writeText(overlayUrl);
