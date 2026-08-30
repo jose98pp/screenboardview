@@ -64,6 +64,47 @@ export const BoardController: React.FC<BoardControllerProps> = ({
   const [lastSaved, setLastSaved] = useState<number>(Date.now());
   const [isUploadingLogo, setIsUploadingLogo] = useState<string | null>(null);
   const [layoutSavedNotice, setLayoutSavedNotice] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [saveToastMessage, setSaveToastMessage] = useState<string | null>(null);
+  const [isEditingTitle, setIsEditingTitle] = useState<boolean>(false);
+  const [titleInputValue, setTitleInputValue] = useState<string>(initialBoard.title);
+
+  // Explicit save action with visual feedback
+  const handleExplicitSave = (customMsg?: string) => {
+    setIsSaving(true);
+    const updated = saveBoard(board);
+    setLastSaved(Date.now());
+    setTimeout(() => {
+      setIsSaving(false);
+      setSaveToastMessage(customMsg || '¡Cambios guardados con éxito! Los nombres, escudos y diseño del overlay permanecen guardados permanentemente.');
+      setTimeout(() => setSaveToastMessage(null), 3500);
+    }, 200);
+  };
+
+  const handleTabSwitch = (newTab: 'controls' | 'customization' | 'teams' | 'hotkeys') => {
+    // Commit current board state immediately so no changes are lost
+    saveBoard(board);
+    setLastSaved(Date.now());
+    setActiveTab(newTab);
+  };
+
+  const handleSafeBack = () => {
+    saveBoard(board);
+    onBack();
+  };
+
+  const handleSaveTitle = () => {
+    if (titleInputValue.trim()) {
+      updateBoard((p) => ({
+        ...p,
+        title: titleInputValue.trim(),
+      }));
+      setIsEditingTitle(false);
+      handleExplicitSave(`Título del marcador actualizado a "${titleInputValue.trim()}"`);
+    } else {
+      setIsEditingTitle(false);
+    }
+  };
 
   const handleSelectLayout = (layoutId: OverlayLayout, label: string) => {
     updateBoard((p) => ({
@@ -71,7 +112,9 @@ export const BoardController: React.FC<BoardControllerProps> = ({
       overlay: { ...p.overlay, layout: layoutId },
     }));
     setLayoutSavedNotice(`Diseño "${label}" guardado`);
+    setSaveToastMessage(`Diseño "${label}" guardado y aplicado a OBS.`);
     setTimeout(() => setLayoutSavedNotice(null), 3000);
+    setTimeout(() => setSaveToastMessage(null), 3500);
   };
 
   // Initialize Realtime Cloud Sync (MQTT / WebSockets) so OBS Browser Source syncs from any machine/process
@@ -382,14 +425,48 @@ export const BoardController: React.FC<BoardControllerProps> = ({
         <div className="mx-auto flex max-w-7xl items-center justify-between">
           <div className="flex items-center gap-3.5">
             <button
-              onClick={onBack}
+              onClick={handleSafeBack}
               className="flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900 px-3.5 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition-all active:scale-95"
             >
               <ChevronLeft className="h-4 w-4" /> Dashboard
             </button>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-base font-black text-white tracking-tight uppercase">{board.title}</h1>
+                {isEditingTitle ? (
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      value={titleInputValue}
+                      onChange={(e) => setTitleInputValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleSaveTitle();
+                        if (e.key === 'Escape') setIsEditingTitle(false);
+                      }}
+                      autoFocus
+                      className="bg-slate-900 border border-indigo-500 rounded-lg px-2 py-0.5 text-sm font-bold text-white uppercase focus:outline-none"
+                    />
+                    <button
+                      onClick={handleSaveTitle}
+                      className="p-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-md text-xs font-bold"
+                    >
+                      <Check className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5">
+                    <h1 className="text-base font-black text-white tracking-tight uppercase">{board.title}</h1>
+                    <button
+                      onClick={() => {
+                        setTitleInputValue(board.title);
+                        setIsEditingTitle(true);
+                      }}
+                      title="Editar nombre del marcador"
+                      className="text-slate-500 hover:text-indigo-400 p-0.5 rounded transition-colors"
+                    >
+                      <Settings className="h-3 w-3" />
+                    </button>
+                  </div>
+                )}
                 <span className="px-2.5 py-0.5 bg-emerald-500/10 text-emerald-400 rounded-full border border-emerald-500/20 text-[10px] font-bold tracking-wider flex items-center gap-1.5">
                   <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
                   LIVE OVERLAY
@@ -398,7 +475,7 @@ export const BoardController: React.FC<BoardControllerProps> = ({
                   title="Todos tus cambios se guardan instantáneamente en tu navegador y en memoria local protegida"
                   className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 bg-slate-900 text-slate-300 rounded-full border border-slate-700/80 text-[10px] font-mono"
                 >
-                  <CheckCircle2 className="h-3 w-3 text-emerald-400" /> Auto-guardado Local
+                  <CheckCircle2 className="h-3 w-3 text-emerald-400" /> Guardado
                 </span>
               </div>
               <p className="text-[11px] text-slate-500 font-mono">KeepScore Control Room // OBS Studio</p>
@@ -406,6 +483,17 @@ export const BoardController: React.FC<BoardControllerProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Explicit Save Changes Button */}
+            <button
+              onClick={() => handleExplicitSave('¡Todos los cambios se han guardado permanentemente!')}
+              disabled={isSaving}
+              className="flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 px-3.5 py-2 text-xs font-bold text-white shadow-lg shadow-emerald-900/30 transition-all cursor-pointer"
+              title="Guardar todos los cambios de nombres, diseño y ajustes permanentemente"
+            >
+              <Save className={`h-3.5 w-3.5 ${isSaving ? 'animate-spin' : ''}`} />
+              <span>{isSaving ? 'Guardando...' : 'Guardar'}</span>
+            </button>
+
             {/* Duplicate current board button */}
             <button
               onClick={handleDuplicateCurrent}
@@ -461,7 +549,7 @@ export const BoardController: React.FC<BoardControllerProps> = ({
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <div className="flex gap-2">
             <button
-              onClick={() => setActiveTab('controls')}
+              onClick={() => handleTabSwitch('controls')}
               className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all ${
                 activeTab === 'controls'
                   ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/30'
@@ -471,7 +559,7 @@ export const BoardController: React.FC<BoardControllerProps> = ({
               <Radio className="h-4 w-4" /> Marcador & Reloj
             </button>
             <button
-              onClick={() => setActiveTab('teams')}
+              onClick={() => handleTabSwitch('teams')}
               className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all ${
                 activeTab === 'teams'
                   ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/30'
@@ -481,7 +569,7 @@ export const BoardController: React.FC<BoardControllerProps> = ({
               <Flag className="h-4 w-4" /> Equipos & Nombres
             </button>
             <button
-              onClick={() => setActiveTab('customization')}
+              onClick={() => handleTabSwitch('customization')}
               className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all ${
                 activeTab === 'customization'
                   ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/30'
@@ -912,6 +1000,27 @@ export const BoardController: React.FC<BoardControllerProps> = ({
         {/* TAB 2: TEAMS & NAMES EDIT */}
         {activeTab === 'teams' && (
           <div className="space-y-6">
+            {/* Action Save Banner Top */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-lg">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-indigo-600/20 text-indigo-400 flex items-center justify-center border border-indigo-500/30">
+                  <Flag className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Nombres, Siglas y Escudos de Equipos</h3>
+                  <p className="text-xs text-slate-400">Todos los datos editados aquí permanecen guardados al cambiar al marcador o al reloj.</p>
+                </div>
+              </div>
+              <button
+                onClick={() => handleExplicitSave('¡Nombres y configuración de equipos guardados permanentemente!')}
+                disabled={isSaving}
+                className="w-full sm:w-auto flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-4 py-2 text-xs font-bold text-white shadow-md shadow-emerald-900/30 active:scale-95 transition-all cursor-pointer"
+              >
+                <Save className="h-3.5 w-3.5" />
+                <span>{isSaving ? 'Guardando...' : 'Guardar Nombres'}</span>
+              </button>
+            </div>
+
             {/* Quick Presets Picker Banner */}
             <div className="rounded-3xl border border-indigo-500/30 bg-slate-900/80 p-5 shadow-xl">
               <div className="flex items-center justify-between mb-3">
@@ -1215,12 +1324,63 @@ export const BoardController: React.FC<BoardControllerProps> = ({
                 </div>
               </div>
             </div>
+
+            {/* Bottom Save Bar for Teams */}
+            <div className="rounded-3xl border border-emerald-500/30 bg-gradient-to-r from-slate-900 via-emerald-950/20 to-slate-900 p-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30 shrink-0">
+                  <CheckCircle2 className="h-5 w-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-white">Configuración de Equipos Persistente</h4>
+                  <p className="text-xs text-slate-400">Los cambios se guardan localmente y se conservan al cambiar al marcador o al reloj.</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <button
+                  onClick={() => handleTabSwitch('controls')}
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 px-4 py-2.5 text-xs font-bold text-slate-200 transition-all cursor-pointer"
+                >
+                  <Radio className="h-3.5 w-3.5 text-indigo-400" />
+                  <span>Ir al Marcador</span>
+                </button>
+                <button
+                  onClick={() => handleExplicitSave('¡Equipos y nombres guardados con éxito en memoria permanente!')}
+                  disabled={isSaving}
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-5 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-900/40 active:scale-95 transition-all cursor-pointer"
+                >
+                  <Save className={`h-4 w-4 ${isSaving ? 'animate-spin' : ''}`} />
+                  <span>Guardar Nombres</span>
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
         {/* TAB 3: OVERLAY CUSTOMIZATION (OBS LAYOUT, FONTS, BG, COMPETITION) */}
         {activeTab === 'customization' && (
           <div className="space-y-6">
+            {/* Top Action banner for Overlay Design */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-lg">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-indigo-600/20 text-indigo-400 flex items-center justify-center border border-indigo-500/30 shrink-0">
+                  <Layers className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Diseño, Estilos y Formato de Overlay</h3>
+                  <p className="text-xs text-slate-400">El formato seleccionado (TV LaLiga, Scorebug, etc.), colores y tipografía se mantendrán guardados permanentemente.</p>
+                </div>
+              </div>
+              <button
+                onClick={() => handleExplicitSave(`¡Diseño "${board.overlay.layout?.replace(/_/g, ' ') || 'Overlay'}" guardado permanentemente!`)}
+                disabled={isSaving}
+                className="w-full sm:w-auto flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-4 py-2 text-xs font-bold text-white shadow-md shadow-emerald-900/30 active:scale-95 transition-all cursor-pointer"
+              >
+                <Save className="h-3.5 w-3.5" />
+                <span>{isSaving ? 'Guardando...' : 'Guardar Diseño'}</span>
+              </button>
+            </div>
+
             {/* COMPETITION / LEAGUE BRANDING (LaLiga style) */}
             <div className="rounded-3xl border border-red-500/40 bg-slate-900 p-6 space-y-4 shadow-2xl relative overflow-hidden">
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -1663,10 +1823,53 @@ export const BoardController: React.FC<BoardControllerProps> = ({
                 </div>
               </div>
             </div>
+
+            {/* Bottom Save Bar for Customization */}
+            <div className="rounded-3xl border border-emerald-500/30 bg-gradient-to-r from-slate-900 via-emerald-950/20 to-slate-900 p-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30 shrink-0">
+                  <CheckCircle2 className="h-5 w-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-white">Diseño Guardado Permanentemente</h4>
+                  <p className="text-xs text-slate-400">Al cambiar a la pestaña de Marcador o Reloj, todos tus ajustes de diseño y liga quedan 100% guardados.</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <button
+                  onClick={() => handleTabSwitch('controls')}
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 px-4 py-2.5 text-xs font-bold text-slate-200 transition-all cursor-pointer"
+                >
+                  <Radio className="h-3.5 w-3.5 text-indigo-400" />
+                  <span>Ir al Marcador</span>
+                </button>
+                <button
+                  onClick={() => handleExplicitSave('¡Diseño y estilos de overlay guardados con éxito!')}
+                  disabled={isSaving}
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-5 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-900/40 active:scale-95 transition-all cursor-pointer"
+                >
+                  <Save className={`h-4 w-4 ${isSaving ? 'animate-spin' : ''}`} />
+                  <span>Guardar Diseño</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
     </main>
+
+      {/* Floating Toast Save Alert */}
+      {saveToastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-2xl border border-emerald-500/50 bg-slate-900/95 px-5 py-3.5 text-xs font-semibold text-white shadow-2xl backdrop-blur-md animate-bounce">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400 shrink-0">
+            <CheckCircle2 className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="font-bold text-emerald-300 text-sm">¡Guardado con Éxito!</p>
+            <p className="text-[11px] text-slate-300 max-w-xs">{saveToastMessage}</p>
+          </div>
+        </div>
+      )}
 
       {/* Hotkeys Quick Helper Modal */}
       {showHotkeysModal && (

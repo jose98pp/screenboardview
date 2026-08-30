@@ -13,7 +13,8 @@ import {
   Check,
   Tv,
   Sparkles,
-  CheckCircle2
+  CheckCircle2,
+  Save
 } from 'lucide-react';
 import { ConfettiEffect } from './ConfettiEffect';
 
@@ -31,6 +32,8 @@ export const GoalController: React.FC<GoalControllerProps> = ({
   const [board, setBoard] = useState<ScoreboardData>(initialBoard);
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveToastMessage, setSaveToastMessage] = useState<string | null>(null);
 
   // Cloud Realtime sync
   useEffect(() => {
@@ -38,6 +41,21 @@ export const GoalController: React.FC<GoalControllerProps> = ({
     const cleanup = initRealtimeSync(board.id, undefined, undefined, true);
     return () => cleanup();
   }, [board.id]);
+
+  const handleExplicitSave = () => {
+    setIsSaving(true);
+    saveBoard(board);
+    setTimeout(() => {
+      setIsSaving(false);
+      setSaveToastMessage('¡Meta guardada con éxito en tu navegador!');
+      setTimeout(() => setSaveToastMessage(null), 3000);
+    }, 200);
+  };
+
+  const handleSafeBack = () => {
+    saveBoard(board);
+    onBack();
+  };
 
   const goal = board.goalConfig || {
     current: 0,
@@ -94,8 +112,8 @@ export const GoalController: React.FC<GoalControllerProps> = ({
         <div className="mx-auto flex max-w-5xl items-center justify-between">
           <div className="flex items-center gap-3.5">
             <button
-              onClick={onBack}
-              className="flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900 px-3.5 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition-all active:scale-95"
+              onClick={handleSafeBack}
+              className="flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900 px-3.5 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition-all active:scale-95 cursor-pointer"
             >
               <ChevronLeft className="h-4 w-4" /> Dashboard
             </button>
@@ -118,6 +136,14 @@ export const GoalController: React.FC<GoalControllerProps> = ({
           </div>
 
           <div className="flex items-center gap-2.5">
+            <button
+              onClick={handleExplicitSave}
+              disabled={isSaving}
+              className="flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 px-3.5 py-2 text-xs font-bold text-white shadow-lg shadow-emerald-900/30 transition-all cursor-pointer"
+            >
+              <Save className={`h-3.5 w-3.5 ${isSaving ? 'animate-spin' : ''}`} />
+              <span>{isSaving ? 'Guardando...' : 'Guardar'}</span>
+            </button>
             <button
               onClick={copyObsUrl}
               className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-lg shadow-indigo-900/30 hover:bg-indigo-500 transition-all active:scale-95"
@@ -267,6 +293,19 @@ export const GoalController: React.FC<GoalControllerProps> = ({
           </div>
         </div>
       </main>
+
+      {/* Floating Toast Save Alert */}
+      {saveToastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-2xl border border-emerald-500/50 bg-slate-900/95 px-5 py-3.5 text-xs font-semibold text-white shadow-2xl backdrop-blur-md animate-bounce">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400 shrink-0">
+            <CheckCircle2 className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="font-bold text-emerald-300 text-sm">¡Guardado con Éxito!</p>
+            <p className="text-[11px] text-slate-300 max-w-xs">{saveToastMessage}</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
