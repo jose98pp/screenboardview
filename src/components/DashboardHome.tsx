@@ -29,7 +29,9 @@ import {
   Target,
   Gamepad2,
   Radio,
-  Sliders
+  Sliders,
+  CheckCircle2,
+  HardDrive
 } from 'lucide-react';
 
 interface DashboardHomeProps {
@@ -165,9 +167,15 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
           {/* Header Info Bar */}
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/10 text-emerald-400 rounded-full border border-emerald-500/20 text-xs font-bold tracking-wide mb-2.5">
-                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
-                OBS LIVE SYNC READY
+              <div className="flex flex-wrap items-center gap-2 mb-2.5">
+                <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/10 text-emerald-400 rounded-full border border-emerald-500/20 text-xs font-bold tracking-wide">
+                  <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                  OBS LIVE SYNC READY
+                </div>
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-900 text-slate-300 rounded-full border border-slate-700/80 text-xs font-mono">
+                  <HardDrive className="h-3.5 w-3.5 text-indigo-400" />
+                  <span>Memoria Local Segura (IndexedDB + LocalStorage)</span>
+                </div>
               </div>
               <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight uppercase">
                 Marcadores & Screen Boards <span className="text-slate-500 font-medium normal-case tracking-normal">// Control Room</span>

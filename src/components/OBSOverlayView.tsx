@@ -41,18 +41,11 @@ export const OBSOverlayView: React.FC<OBSOverlayViewProps> = ({ boardId: propBoa
       initialBoard = getBoardById(boardId);
     }
 
-    // 3. Fallback: if not found by specific ID, check if we have any boards or create a default with that ID
+    // 3. Fallback: if not found by specific ID, create a clean in-memory placeholder without altering localStorage
     if (!initialBoard && boardId) {
-      const all = loadAllBoards();
-      if (all.length > 0) {
-        // Use first board as template with this ID
-        initialBoard = { ...all[0], id: boardId };
-        saveBoard(initialBoard);
-      } else {
-        initialBoard = createNewBoard('sports_match', 'soccer', 'Marcador en Vivo');
-        initialBoard.id = boardId;
-        saveBoard(initialBoard);
-      }
+      initialBoard = createNewBoard('sports_match', 'soccer', 'Marcador en Vivo');
+      initialBoard.id = boardId;
+      // Do not write to localStorage until received from active controller
     }
 
     if (initialBoard) {

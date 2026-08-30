@@ -27,7 +27,7 @@ export function createNewBoard(
   sport: SportPreset = 'soccer',
   customTitle?: string
 ): ScoreboardData {
-  const id = 'sb_' + Math.random().toString(36).substring(2, 9);
+  const id = 'sb_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 7);
   const now = Date.now();
 
   switch (type) {

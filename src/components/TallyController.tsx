@@ -12,7 +12,8 @@ import {
   Copy,
   Check,
   Tv,
-  RotateCcw
+  RotateCcw,
+  CheckCircle2
 } from 'lucide-react';
 
 interface TallyControllerProps {
@@ -105,6 +106,12 @@ export const TallyController: React.FC<TallyControllerProps> = ({
                 <span className="px-2.5 py-0.5 bg-emerald-500/10 text-emerald-400 rounded-full border border-emerald-500/20 text-[10px] font-bold tracking-wider flex items-center gap-1.5">
                   <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
                   TALLY LIVE
+                </span>
+                <span
+                  title="Guardado localmente en tu navegador"
+                  className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 bg-slate-900 text-slate-300 rounded-full border border-slate-700/80 text-[10px] font-mono"
+                >
+                  <CheckCircle2 className="h-3 w-3 text-emerald-400" /> Guardado Local
                 </span>
               </div>
               <p className="text-[11px] text-slate-500 font-mono">Contador Múltiple // OBS Studio</p>

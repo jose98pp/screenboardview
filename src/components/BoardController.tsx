@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ScoreboardData, OverlayLayout, FontFamilyChoice, OverlayBackground } from '../types';
-import { saveBoard, broadcastTriggerSound } from '../utils/storage';
+import { saveBoard, broadcastTriggerSound, duplicateBoard, exportSingleBoardToJson } from '../utils/storage';
 import { initRealtimeSync, publishBoardUpdate, encodeBoardToUrlParam } from '../utils/realtimeSync';
 import { playSound } from '../utils/audio';
+import { compressImageFile } from '../utils/imageCompressor';
 import { POPULAR_TEAMS_PRESETS, COMPETITION_PRESETS } from '../data/teamPresets';
 import {
   Play,
@@ -33,7 +34,11 @@ import {
   Image as ImageIcon,
   Shield,
   Trophy,
-  Star
+  Star,
+  Save,
+  Download,
+  Copy as DuplicateIcon,
+  CheckCircle2
 } from 'lucide-react';
 import { ConfettiEffect } from './ConfettiEffect';
 
@@ -51,8 +56,11 @@ export const BoardController: React.FC<BoardControllerProps> = ({
   const [board, setBoard] = useState<ScoreboardData>(initialBoard);
   const [activeTab, setActiveTab] = useState<'controls' | 'customization' | 'teams' | 'hotkeys'>('controls');
   const [copiedUrl, setCopiedUrl] = useState(false);
+  const [copiedBackup, setCopiedBackup] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
   const [showHotkeysModal, setShowHotkeysModal] = useState(false);
+  const [lastSaved, setLastSaved] = useState<number>(Date.now());
+  const [isUploadingLogo, setIsUploadingLogo] = useState<string | null>(null);
 
   // Initialize Realtime Cloud Sync (MQTT / WebSockets) so OBS Browser Source syncs from any machine/process
   useEffect(() => {
@@ -82,8 +90,55 @@ export const BoardController: React.FC<BoardControllerProps> = ({
     setBoard((prev) => {
       const next = updater(prev);
       saveBoard(next);
+      setLastSaved(Date.now());
       return next;
     });
+  };
+
+  const handleDuplicateCurrent = () => {
+    const dup = duplicateBoard(board.id);
+    if (dup) {
+      alert(`¡Marcador duplicado con éxito como "${dup.title}"! Puedes encontrarlo en el Dashboard.`);
+    }
+  };
+
+  const handleExportSingle = () => {
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(exportSingleBoardToJson(board));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute('href', dataStr);
+    downloadAnchor.setAttribute('download', `marcador_${board.id}_${Date.now()}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+  };
+
+  // Image Upload with Automatic Safe Compression (prevents quota issues & maximizes OBS fps)
+  const handleUploadImage = async (file: File, target: 'home' | 'away' | 'league') => {
+    try {
+      setIsUploadingLogo(target);
+      const compressedDataUrl = await compressImageFile(file, target === 'league' ? 400 : 320);
+      if (target === 'home') {
+        updateBoard((p) => ({
+          ...p,
+          homeTeam: { ...p.homeTeam, logoUrl: compressedDataUrl },
+        }));
+      } else if (target === 'away') {
+        updateBoard((p) => ({
+          ...p,
+          awayTeam: { ...p.awayTeam, logoUrl: compressedDataUrl },
+        }));
+      } else if (target === 'league') {
+        updateBoard((p) => ({
+          ...p,
+          overlay: { ...p.overlay, leagueLogoUrl: compressedDataUrl },
+        }));
+      }
+    } catch (err) {
+      console.error('Error compressing image:', err);
+      alert('No se pudo procesar la imagen seleccionada.');
+    } finally {
+      setIsUploadingLogo(null);
+    }
   };
 
   // Timer Tick
@@ -327,12 +382,36 @@ export const BoardController: React.FC<BoardControllerProps> = ({
                   <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
                   LIVE OVERLAY
                 </span>
+                <span
+                  title="Todos tus cambios se guardan instantáneamente en tu navegador y en memoria local protegida"
+                  className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 bg-slate-900 text-slate-300 rounded-full border border-slate-700/80 text-[10px] font-mono"
+                >
+                  <CheckCircle2 className="h-3 w-3 text-emerald-400" /> Auto-guardado Local
+                </span>
               </div>
               <p className="text-[11px] text-slate-500 font-mono">KeepScore Control Room // OBS Studio</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
+            {/* Duplicate current board button */}
+            <button
+              onClick={handleDuplicateCurrent}
+              title="Duplicar este marcador para crear una nueva versión independiente"
+              className="hidden lg:flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900/80 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
+            >
+              <DuplicateIcon className="h-3.5 w-3.5" /> Duplicar
+            </button>
+
+            {/* Export single board JSON */}
+            <button
+              onClick={handleExportSingle}
+              title="Descargar copia de seguridad de este marcador (.json)"
+              className="hidden sm:flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900/80 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
+            >
+              <Download className="h-3.5 w-3.5" /> Copia JSON
+            </button>
+
             {/* Quick OBS Link */}
             <button
               onClick={copyObsUrl}
@@ -925,25 +1004,14 @@ export const BoardController: React.FC<BoardControllerProps> = ({
                     />
                     <label className="cursor-pointer flex items-center justify-center gap-1 rounded-xl bg-slate-800 hover:bg-slate-700 px-3 py-1.5 text-xs font-bold text-slate-200 border border-slate-700 active:scale-95 transition-all">
                       <Upload className="h-3.5 w-3.5" />
-                      <span>Subir</span>
+                      <span>{isUploadingLogo === 'home' ? 'Guardando...' : 'Subir'}</span>
                       <input
                         type="file"
                         accept="image/*"
                         className="hidden"
                         onChange={(e) => {
                           const file = e.target.files?.[0];
-                          if (file) {
-                            const reader = new FileReader();
-                            reader.onload = (ev) => {
-                              if (ev.target?.result) {
-                                updateBoard((p) => ({
-                                  ...p,
-                                  homeTeam: { ...p.homeTeam, logoUrl: ev.target!.result as string },
-                                }));
-                              }
-                            };
-                            reader.readAsDataURL(file);
-                          }
+                          if (file) handleUploadImage(file, 'home');
                         }}
                       />
                     </label>
@@ -1066,25 +1134,14 @@ export const BoardController: React.FC<BoardControllerProps> = ({
                     />
                     <label className="cursor-pointer flex items-center justify-center gap-1 rounded-xl bg-slate-800 hover:bg-slate-700 px-3 py-1.5 text-xs font-bold text-slate-200 border border-slate-700 active:scale-95 transition-all">
                       <Upload className="h-3.5 w-3.5" />
-                      <span>Subir</span>
+                      <span>{isUploadingLogo === 'away' ? 'Guardando...' : 'Subir'}</span>
                       <input
                         type="file"
                         accept="image/*"
                         className="hidden"
                         onChange={(e) => {
                           const file = e.target.files?.[0];
-                          if (file) {
-                            const reader = new FileReader();
-                            reader.onload = (ev) => {
-                              if (ev.target?.result) {
-                                updateBoard((p) => ({
-                                  ...p,
-                                  awayTeam: { ...p.awayTeam, logoUrl: ev.target!.result as string },
-                                }));
-                              }
-                            };
-                            reader.readAsDataURL(file);
-                          }
+                          if (file) handleUploadImage(file, 'away');
                         }}
                       />
                     </label>
@@ -1216,19 +1273,34 @@ export const BoardController: React.FC<BoardControllerProps> = ({
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-slate-400 block mb-1">Logo URL de la Liga</label>
-                  <input
-                    type="text"
-                    placeholder="https://.../logo.png"
-                    value={board.overlay.leagueLogoUrl || ''}
-                    onChange={(e) =>
-                      updateBoard((p) => ({
-                        ...p,
-                        overlay: { ...p.overlay, leagueLogoUrl: e.target.value },
-                      }))
-                    }
-                    className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white font-mono"
-                  />
+                  <label className="text-xs font-semibold text-slate-400 block mb-1">Logo de la Liga (URL / Archivo)</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="https://.../logo.png"
+                      value={board.overlay.leagueLogoUrl || ''}
+                      onChange={(e) =>
+                        updateBoard((p) => ({
+                          ...p,
+                          overlay: { ...p.overlay, leagueLogoUrl: e.target.value },
+                        }))
+                      }
+                      className="flex-1 rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white font-mono placeholder-slate-600 focus:border-indigo-500 focus:outline-none"
+                    />
+                    <label className="cursor-pointer flex items-center justify-center gap-1 rounded-xl bg-slate-800 hover:bg-slate-700 px-3 py-1.5 text-xs font-bold text-slate-200 border border-slate-700 active:scale-95 transition-all">
+                      <Upload className="h-3.5 w-3.5" />
+                      <span>{isUploadingLogo === 'league' ? 'Guardando...' : 'Subir'}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleUploadImage(file, 'league');
+                        }}
+                      />
+                    </label>
+                  </div>
                 </div>
               </div>
             </div>

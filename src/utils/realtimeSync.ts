@@ -61,8 +61,8 @@ export function initRealtimeSync(
           const msg = JSON.parse(payload.toString());
           if (msg.type === 'BOARD_UPDATED' && msg.board) {
             const incomingBoard = msg.board as ScoreboardData;
-            // Save locally in this browser instance (e.g. inside OBS CEF)
-            saveBoard(incomingBoard);
+            // Save locally in this browser instance (e.g. inside OBS CEF) without re-broadcasting
+            saveBoard(incomingBoard, { skipBroadcast: true });
             listeners.forEach((cb) => cb(incomingBoard));
           } else if (msg.type === 'REQUEST_STATE' && isController) {
             // OBS overlay is asking for the latest board state! Reply with our current board
