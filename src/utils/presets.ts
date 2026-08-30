@@ -1,7 +1,7 @@
 import { ScoreboardData, SportPreset, BoardType } from '../types';
 
 export const DEFAULT_OVERLAY_SETTINGS = {
-  layout: 'top_scorebug' as const,
+  layout: 'tv_broadcast_timer_below' as const,
   background: 'transparent' as const,
   fontFamily: 'Chakra Petch' as const,
   scale: 1,
@@ -77,7 +77,7 @@ export function createNewBoard(
           tallies: [],
           overlay: {
             ...DEFAULT_OVERLAY_SETTINGS,
-            layout: 'top_scorebug',
+            layout: 'scorebug_narrow',
             fontFamily: 'Montserrat',
             showFouls: true,
             showPossession: true,
@@ -125,7 +125,7 @@ export function createNewBoard(
           tallies: [],
           overlay: {
             ...DEFAULT_OVERLAY_SETTINGS,
-            layout: 'top_scorebug',
+            layout: 'scorebug_narrow',
             fontFamily: 'Inter',
             showSets: true,
             showPossession: true,
@@ -177,7 +177,7 @@ export function createNewBoard(
         tallies: [],
         overlay: {
           ...DEFAULT_OVERLAY_SETTINGS,
-          layout: 'top_scorebug',
+          layout: 'tv_broadcast_timer_below',
           fontFamily: 'Oswald',
           showSets: false,
         },

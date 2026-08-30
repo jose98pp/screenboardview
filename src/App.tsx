@@ -50,12 +50,27 @@ export default function App() {
   };
 
   const handleSelectBoard = (board: ScoreboardData) => {
+    // Ensure boards state is refreshed immediately
+    const all = loadAllBoards();
+    setBoards(all);
     setSelectedBoardId(board.id);
   };
 
   const handleBackToDashboard = () => {
     setSelectedBoardId(null);
     refreshBoards();
+  };
+
+  const handleUpdateActiveBoard = (updated: ScoreboardData) => {
+    setBoards((prev) => {
+      const idx = prev.findIndex((b) => b.id === updated.id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = updated;
+        return next;
+      }
+      return [updated, ...prev];
+    });
   };
 
   const handleOpenObsHelp = (boardId?: string) => {
@@ -68,8 +83,10 @@ export default function App() {
     return <OBSOverlayView boardId={selectedBoardId || undefined} />;
   }
 
-  // Current active board if selected
-  const activeBoard = selectedBoardId ? boards.find((b) => b.id === selectedBoardId) || null : null;
+  // Current active board retrieved fresh from storage or list
+  const activeBoard = selectedBoardId
+    ? getBoardById(selectedBoardId) || boards.find((b) => b.id === selectedBoardId) || null
+    : null;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 selection:bg-indigo-600 selection:text-white font-sans">
@@ -88,24 +105,28 @@ export default function App() {
         />
       ) : activeBoard.type === 'leaderboard' ? (
         <LeaderboardController
+          key={activeBoard.id}
           board={activeBoard}
           onBack={handleBackToDashboard}
           onOpenObsHelp={() => handleOpenObsHelp(activeBoard.id)}
         />
       ) : activeBoard.type === 'tally_counter' ? (
         <TallyController
+          key={activeBoard.id}
           board={activeBoard}
           onBack={handleBackToDashboard}
           onOpenObsHelp={() => handleOpenObsHelp(activeBoard.id)}
         />
       ) : activeBoard.type === 'stream_goal' ? (
         <GoalController
+          key={activeBoard.id}
           board={activeBoard}
           onBack={handleBackToDashboard}
           onOpenObsHelp={() => handleOpenObsHelp(activeBoard.id)}
         />
       ) : (
         <BoardController
+          key={activeBoard.id}
           board={activeBoard}
           onBack={handleBackToDashboard}
           onOpenObsHelp={() => handleOpenObsHelp(activeBoard.id)}

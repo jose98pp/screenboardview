@@ -41,6 +41,7 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { ConfettiEffect } from './ConfettiEffect';
+import { OverlayLivePreview } from './OverlayLivePreview';
 
 interface BoardControllerProps {
   board: ScoreboardData;
@@ -61,6 +62,16 @@ export const BoardController: React.FC<BoardControllerProps> = ({
   const [showHotkeysModal, setShowHotkeysModal] = useState(false);
   const [lastSaved, setLastSaved] = useState<number>(Date.now());
   const [isUploadingLogo, setIsUploadingLogo] = useState<string | null>(null);
+  const [layoutSavedNotice, setLayoutSavedNotice] = useState<string | null>(null);
+
+  const handleSelectLayout = (layoutId: OverlayLayout, label: string) => {
+    updateBoard((p) => ({
+      ...p,
+      overlay: { ...p.overlay, layout: layoutId },
+    }));
+    setLayoutSavedNotice(`Diseño "${label}" guardado`);
+    setTimeout(() => setLayoutSavedNotice(null), 3000);
+  };
 
   // Initialize Realtime Cloud Sync (MQTT / WebSockets) so OBS Browser Source syncs from any machine/process
   useEffect(() => {
@@ -1305,6 +1316,69 @@ export const BoardController: React.FC<BoardControllerProps> = ({
               </div>
             </div>
 
+            {/* Live Interactive Preview of Active Overlay */}
+            <div className="rounded-3xl border border-indigo-500/40 bg-slate-900/90 p-6 shadow-xl relative overflow-hidden">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 pb-3 mb-4 gap-2">
+                <div className="flex items-center gap-2">
+                  <Tv className="h-5 w-5 text-indigo-400" />
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+                    Vista Previa en Vivo del Marcador (OBS Overlay)
+                  </h3>
+                </div>
+                <div className="flex items-center gap-2">
+                  {layoutSavedNotice && (
+                    <span className="flex items-center gap-1.5 px-3 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-full text-xs font-bold animate-pulse">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                      {layoutSavedNotice}
+                    </span>
+                  )}
+                  <span className="text-[11px] font-mono text-slate-400 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
+                    Diseño: <strong className="text-indigo-300 uppercase">{board.overlay.layout?.replace(/_/g, ' ') || 'TV BROADCAST'}</strong>
+                  </span>
+                </div>
+              </div>
+
+              {/* Stadium / Stream Backdrop */}
+              <div
+                className={`relative rounded-2xl border border-slate-800/80 overflow-hidden flex items-center justify-center min-h-[160px] ${
+                  board.overlay.background === 'green_screen'
+                    ? 'bg-[#00ff00]'
+                    : board.overlay.background === 'dark_glass'
+                    ? 'bg-slate-950/80 backdrop-blur-md'
+                    : 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-black'
+                }`}
+              >
+                {board.overlay.background === 'transparent' && (
+                  <div
+                    className="absolute inset-0 opacity-10 pointer-events-none"
+                    style={{
+                      backgroundImage:
+                        'linear-gradient(45deg, #888 25%, transparent 25%), linear-gradient(-45deg, #888 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #888 75%), linear-gradient(-45deg, transparent 75%, #888 75%)',
+                      backgroundSize: '16px 16px',
+                      backgroundPosition: '0 0, 0 8px, 8px -8px, -8px 0px',
+                    }}
+                  />
+                )}
+
+                <div className="relative z-10 w-full py-3 px-2 flex justify-center">
+                  <OverlayLivePreview board={board} />
+                </div>
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400 font-mono">
+                <span className="flex items-center gap-1.5 text-emerald-400">
+                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping inline-block" />
+                  Cambios aplicados y guardados automáticamente en OBS
+                </span>
+                <button
+                  onClick={copyObsUrl}
+                  className="text-indigo-400 hover:text-indigo-300 font-bold flex items-center gap-1 hover:underline"
+                >
+                  <Copy className="h-3.5 w-3.5" /> Copiar enlace para OBS Browser Source
+                </button>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Layout & Style Presets */}
               <div className="rounded-3xl border border-slate-800 bg-slate-900 p-6 space-y-6">
@@ -1375,14 +1449,9 @@ export const BoardController: React.FC<BoardControllerProps> = ({
                     ].map((item) => (
                       <button
                         key={item.id}
-                        onClick={() =>
-                          updateBoard((p) => ({
-                            ...p,
-                            overlay: { ...p.overlay, layout: item.id as OverlayLayout },
-                          }))
-                        }
+                        onClick={() => handleSelectLayout(item.id as OverlayLayout, item.label)}
                         className={`flex items-start justify-between rounded-2xl p-3.5 text-left border transition-all ${
-                          board.overlay.layout === item.id
+                          board.overlay.layout === item.id || (!board.overlay.layout && item.id === 'tv_broadcast_timer_below')
                             ? 'border-indigo-500 bg-indigo-950/50 shadow-lg shadow-indigo-500/20 ring-1 ring-indigo-500'
                             : 'border-slate-800 bg-slate-950/70 hover:border-slate-700'
                         }`}
@@ -1398,8 +1467,14 @@ export const BoardController: React.FC<BoardControllerProps> = ({
                           </div>
                           <span className="text-[11px] text-slate-400 mt-1 block leading-relaxed">{item.desc}</span>
                         </div>
-                        <div className={`h-4 w-4 rounded-full border flex items-center justify-center mt-0.5 ${board.overlay.layout === item.id ? 'border-indigo-400 bg-indigo-500' : 'border-slate-700'}`}>
-                          {board.overlay.layout === item.id && <div className="h-1.5 w-1.5 rounded-full bg-white" />}
+                        <div className={`h-4 w-4 rounded-full border flex items-center justify-center mt-0.5 ${
+                          board.overlay.layout === item.id || (!board.overlay.layout && item.id === 'tv_broadcast_timer_below')
+                            ? 'border-indigo-400 bg-indigo-500'
+                            : 'border-slate-700'
+                        }`}>
+                          {(board.overlay.layout === item.id || (!board.overlay.layout && item.id === 'tv_broadcast_timer_below')) && (
+                            <div className="h-1.5 w-1.5 rounded-full bg-white" />
+                          )}
                         </div>
                       </button>
                     ))}

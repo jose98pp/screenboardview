@@ -127,23 +127,65 @@ export function broadcastTriggerSound(soundType: string, volume: number = 0.7) {
 export function loadAllBoards(): ScoreboardData[] {
   if (typeof window === 'undefined') return [];
   try {
+    let boardsList: ScoreboardData[] = [];
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      // Seed default boards on first visit
-      const defaultBoards: ScoreboardData[] = [
-        createNewBoard('sports_match', 'soccer', 'Fútbol: Real Madrid vs Barcelona'),
-        createNewBoard('sports_match', 'basketball', 'NBA Final: Lakers vs Celtics'),
-        createNewBoard('esports_bo', 'esports', 'Esports Champions (BO5)'),
-        createNewBoard('leaderboard', 'generic', 'Torneo de Trivia en Vivo'),
-        createNewBoard('tally_counter', 'generic', 'Contador de Stream / Kills & Wins'),
-      ];
-      saveAllBoards(defaultBoards);
-      return defaultBoards;
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          boardsList = parsed;
+        }
+      } catch (e) {
+        console.warn('Error parsing master boards array:', e);
+      }
     }
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      return parsed;
+
+    // Scan all isolated single-board keys to guarantee latest changes (like layout design) are never lost
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(SINGLE_BOARD_PREFIX)) {
+          try {
+            const singleRaw = localStorage.getItem(key);
+            if (singleRaw) {
+              const singleBoard = JSON.parse(singleRaw) as ScoreboardData;
+              if (singleBoard && singleBoard.id) {
+                const existingIdx = boardsList.findIndex((b) => b.id === singleBoard.id);
+                if (existingIdx >= 0) {
+                  if (
+                    !boardsList[existingIdx].updatedAt ||
+                    (singleBoard.updatedAt && singleBoard.updatedAt >= boardsList[existingIdx].updatedAt)
+                  ) {
+                    boardsList[existingIdx] = singleBoard;
+                  }
+                } else {
+                  boardsList.push(singleBoard);
+                }
+              }
+            }
+          } catch (itemErr) {
+            // Ignore single malformed entry
+          }
+        }
+      }
+    } catch (scanErr) {
+      console.warn('LocalStorage key scan warning:', scanErr);
     }
+
+    if (boardsList.length > 0) {
+      return boardsList;
+    }
+
+    // Seed default boards on first visit
+    const defaultBoards: ScoreboardData[] = [
+      createNewBoard('sports_match', 'soccer', 'Fútbol: Real Madrid vs Barcelona'),
+      createNewBoard('sports_match', 'basketball', 'NBA Final: Lakers vs Celtics'),
+      createNewBoard('esports_bo', 'esports', 'Esports Champions (BO5)'),
+      createNewBoard('leaderboard', 'generic', 'Torneo de Trivia en Vivo'),
+      createNewBoard('tally_counter', 'generic', 'Contador de Stream / Kills & Wins'),
+    ];
+    saveAllBoards(defaultBoards);
+    return defaultBoards;
   } catch (e) {
     console.error('Error loading boards from localStorage:', e);
   }
