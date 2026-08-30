@@ -1,36 +1,111 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { ScoreboardData, OverlayLayout } from '../types';
-import { getBoardById, getSyncChannel } from '../utils/storage';
+import { getBoardById, getSyncChannel, saveBoard, loadAllBoards } from '../utils/storage';
+import { initRealtimeSync, decodeBoardFromUrlParam } from '../utils/realtimeSync';
+import { createNewBoard } from '../utils/presets';
 import { playSound } from '../utils/audio';
 import { ConfettiEffect } from './ConfettiEffect';
-import { Trophy, Clock, Flame, ChevronRight, Shield, Bell } from 'lucide-react';
+import { Trophy, Clock, Flame, ChevronRight, Shield, Bell, Wifi } from 'lucide-react';
 
 interface OBSOverlayViewProps {
   boardId?: string;
 }
 
-export const OBSOverlayView: React.FC<OBSOverlayViewProps> = ({ boardId }) => {
+export const OBSOverlayView: React.FC<OBSOverlayViewProps> = ({ boardId: propBoardId }) => {
   const [board, setBoard] = useState<ScoreboardData | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
   const [lastHomeScore, setLastHomeScore] = useState<number | null>(null);
   const [lastAwayScore, setLastAwayScore] = useState<number | null>(null);
   const [homeScoreAnimated, setHomeScoreAnimated] = useState(false);
   const [awayScoreAnimated, setAwayScoreAnimated] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
 
   const timerRef = useRef<number | null>(null);
 
-  // Load board initially
+  // Extract ID and data payload from URL
+  const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+  const boardId = propBoardId || urlParams?.get('id') || undefined;
+  const dataParam = urlParams?.get('data');
+
+  // Load board initially (from URL data, localStorage, or fallback)
+  useEffect(() => {
+    let initialBoard: ScoreboardData | null = null;
+
+    // 1. Try URL encoded data if provided
+    if (dataParam) {
+      initialBoard = decodeBoardFromUrlParam(dataParam);
+    }
+
+    // 2. Try localStorage by ID
+    if (!initialBoard && boardId) {
+      initialBoard = getBoardById(boardId);
+    }
+
+    // 3. Fallback: if not found by specific ID, check if we have any boards or create a default with that ID
+    if (!initialBoard && boardId) {
+      const all = loadAllBoards();
+      if (all.length > 0) {
+        // Use first board as template with this ID
+        initialBoard = { ...all[0], id: boardId };
+        saveBoard(initialBoard);
+      } else {
+        initialBoard = createNewBoard('sports_match', 'soccer', 'Marcador en Vivo');
+        initialBoard.id = boardId;
+        saveBoard(initialBoard);
+      }
+    }
+
+    if (initialBoard) {
+      setBoard(initialBoard);
+      setLastHomeScore(initialBoard.homeTeam.score);
+      setLastAwayScore(initialBoard.awayTeam.score);
+    }
+  }, [boardId, dataParam]);
+
+  // Connect to Realtime Cloud Relay (WebSockets/MQTT) for OBS Browser Source cross-process sync
   useEffect(() => {
     if (!boardId) return;
-    const initial = getBoardById(boardId);
-    if (initial) {
-      setBoard(initial);
-      setLastHomeScore(initial.homeTeam.score);
-      setLastAwayScore(initial.awayTeam.score);
-    }
-  }, [boardId]);
 
-  // Listen to BroadcastChannel & storage events for 0-latency live OBS updates
+    const cleanupRealtime = initRealtimeSync(
+      boardId,
+      (updatedBoard) => {
+        setIsConnected(true);
+        setBoard(updatedBoard);
+
+        // Detect score changes for animations & sound
+        if (lastHomeScore !== null && updatedBoard.homeTeam.score > lastHomeScore) {
+          setHomeScoreAnimated(true);
+          setTimeout(() => setHomeScoreAnimated(false), 900);
+          if (updatedBoard.overlay?.soundEnabled) {
+            playSound('point', updatedBoard.overlay.soundVolume || 0.6);
+          }
+        }
+        if (lastAwayScore !== null && updatedBoard.awayTeam.score > lastAwayScore) {
+          setAwayScoreAnimated(true);
+          setTimeout(() => setAwayScoreAnimated(false), 900);
+          if (updatedBoard.overlay?.soundEnabled) {
+            playSound('point', updatedBoard.overlay.soundVolume || 0.6);
+          }
+        }
+
+        setLastHomeScore(updatedBoard.homeTeam.score);
+        setLastAwayScore(updatedBoard.awayTeam.score);
+      },
+      (soundType, volume) => {
+        playSound(soundType as any, volume);
+        if (soundType === 'fanfare' || soundType === 'goal') {
+          setShowConfetti(true);
+        }
+      },
+      false // Is listener / overlay
+    );
+
+    return () => {
+      cleanupRealtime();
+    };
+  }, [boardId, lastHomeScore, lastAwayScore]);
+
+  // Also listen to local BroadcastChannel & storage events for same-browser multi-tab previews
   useEffect(() => {
     const channel = getSyncChannel();
 
@@ -39,8 +114,8 @@ export const OBSOverlayView: React.FC<OBSOverlayViewProps> = ({ boardId }) => {
         if (!boardId || event.data.boardId === boardId) {
           const updated: ScoreboardData = event.data.board;
           setBoard(updated);
+          setIsConnected(true);
 
-          // Detect score changes to trigger animations & sounds
           if (lastHomeScore !== null && updated.homeTeam.score > lastHomeScore) {
             setHomeScoreAnimated(true);
             setTimeout(() => setHomeScoreAnimated(false), 900);
@@ -70,7 +145,10 @@ export const OBSOverlayView: React.FC<OBSOverlayViewProps> = ({ boardId }) => {
     const handleStorage = (e: StorageEvent) => {
       if (e.key === 'scoreboard_studio_boards_v1' && boardId) {
         const fresh = getBoardById(boardId);
-        if (fresh) setBoard(fresh);
+        if (fresh) {
+          setBoard(fresh);
+          setIsConnected(true);
+        }
       }
     };
 

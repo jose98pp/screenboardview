@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ScoreboardData, PlayerScore } from '../types';
 import { saveBoard, broadcastTriggerSound } from '../utils/storage';
+import { initRealtimeSync, publishBoardUpdate } from '../utils/realtimeSync';
 import { playSound } from '../utils/audio';
 import {
   Trophy,
@@ -34,6 +35,13 @@ export const LeaderboardController: React.FC<LeaderboardControllerProps> = ({
   const [showConfetti, setShowConfetti] = useState(false);
   const [newPlayerName, setNewPlayerName] = useState('');
   const [newPlayerEmoji, setNewPlayerEmoji] = useState('🎮');
+
+  // Cloud Realtime sync
+  useEffect(() => {
+    publishBoardUpdate(board);
+    const cleanup = initRealtimeSync(board.id, undefined, undefined, true);
+    return () => cleanup();
+  }, [board.id]);
 
   const updateBoard = (updater: (prev: ScoreboardData) => ScoreboardData) => {
     setBoard((prev) => {

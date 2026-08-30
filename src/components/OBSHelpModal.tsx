@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { Copy, Check, Tv, ExternalLink, X, Monitor, ShieldCheck, Zap } from 'lucide-react';
+import { Copy, Check, Tv, ExternalLink, X, Monitor, ShieldCheck, Zap, Wifi } from 'lucide-react';
+import { getBoardById } from '../utils/storage';
+import { encodeBoardToUrlParam } from '../utils/realtimeSync';
 
 interface OBSHelpModalProps {
   isOpen: boolean;
@@ -9,19 +11,33 @@ interface OBSHelpModalProps {
 
 export const OBSHelpModal: React.FC<OBSHelpModalProps> = ({ isOpen, onClose, boardId }) => {
   const [copiedUrl, setCopiedUrl] = useState(false);
+  const [copiedDataUrl, setCopiedDataUrl] = useState(false);
   const [copiedCss, setCopiedCss] = useState(false);
 
   if (!isOpen) return null;
 
   const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+  const currentBoard = boardId ? getBoardById(boardId) : null;
+  const compressedData = currentBoard ? encodeBoardToUrlParam(currentBoard) : '';
+
   const overlayUrl = boardId
     ? `${currentOrigin}/?mode=overlay&id=${boardId}`
     : `${currentOrigin}/?mode=overlay`;
+
+  const instantDataUrl = boardId && compressedData
+    ? `${currentOrigin}/?mode=overlay&id=${boardId}&data=${compressedData}`
+    : overlayUrl;
 
   const handleCopyUrl = () => {
     navigator.clipboard.writeText(overlayUrl);
     setCopiedUrl(true);
     setTimeout(() => setCopiedUrl(false), 2500);
+  };
+
+  const handleCopyDataUrl = () => {
+    navigator.clipboard.writeText(instantDataUrl);
+    setCopiedDataUrl(true);
+    setTimeout(() => setCopiedDataUrl(false), 2500);
   };
 
   const sampleCss = `/* Opcional: fondo transparente garantizado y nitidez */
@@ -62,10 +78,15 @@ body {
         {/* Content */}
         <div className="max-h-[75vh] overflow-y-auto p-6 space-y-6">
           {/* Quick URL Box */}
-          <div className="rounded-xl border border-indigo-500/40 bg-indigo-950/30 p-4">
-            <label className="text-xs font-semibold uppercase tracking-wider text-indigo-300 block mb-2">
-              URL del Marcador para OBS (Fondo Transparente)
-            </label>
+          <div className="rounded-xl border border-indigo-500/40 bg-indigo-950/30 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold uppercase tracking-wider text-indigo-300 flex items-center gap-1.5">
+                <Wifi className="h-3.5 w-3.5 text-emerald-400 animate-pulse" /> URL en Tiempo Real para OBS
+              </label>
+              <span className="text-[10px] text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-500/30 font-bold">
+                Cloud Sync Activo
+              </span>
+            </div>
             <div className="flex items-center gap-2">
               <input
                 type="text"

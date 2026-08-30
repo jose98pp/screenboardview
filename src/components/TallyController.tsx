@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ScoreboardData, TallyItem } from '../types';
 import { saveBoard } from '../utils/storage';
+import { initRealtimeSync, publishBoardUpdate } from '../utils/realtimeSync';
 import { playSound } from '../utils/audio';
 import {
   Hash,
@@ -28,6 +29,13 @@ export const TallyController: React.FC<TallyControllerProps> = ({
   const [board, setBoard] = useState<ScoreboardData>(initialBoard);
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [newLabel, setNewLabel] = useState('');
+
+  // Cloud Realtime sync
+  useEffect(() => {
+    publishBoardUpdate(board);
+    const cleanup = initRealtimeSync(board.id, undefined, undefined, true);
+    return () => cleanup();
+  }, [board.id]);
 
   const updateBoard = (updater: (prev: ScoreboardData) => ScoreboardData) => {
     setBoard((prev) => {

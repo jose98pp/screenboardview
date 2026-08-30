@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ScoreboardData } from '../types';
 import { saveBoard, broadcastTriggerSound } from '../utils/storage';
+import { initRealtimeSync, publishBoardUpdate } from '../utils/realtimeSync';
 import { playSound } from '../utils/audio';
 import {
   Target,
@@ -28,6 +29,13 @@ export const GoalController: React.FC<GoalControllerProps> = ({
   const [board, setBoard] = useState<ScoreboardData>(initialBoard);
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
+
+  // Cloud Realtime sync
+  useEffect(() => {
+    publishBoardUpdate(board);
+    const cleanup = initRealtimeSync(board.id, undefined, undefined, true);
+    return () => cleanup();
+  }, [board.id]);
 
   const goal = board.goalConfig || {
     current: 0,

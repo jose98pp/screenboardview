@@ -1,5 +1,6 @@
 import { ScoreboardData } from '../types';
 import { createNewBoard } from './presets';
+import { publishBoardUpdate, publishSound } from './realtimeSync';
 
 const STORAGE_KEY = 'scoreboard_studio_boards_v1';
 const SYNC_CHANNEL_NAME = 'scoreboard_studio_sync_channel';
@@ -31,6 +32,13 @@ export function broadcastBoardUpdate(board: ScoreboardData) {
   } catch (err) {
     console.warn('BroadcastChannel postMessage error:', err);
   }
+
+  // Also broadcast via Cloud Realtime Relay (WebSockets/MQTT) for OBS Browser Source
+  try {
+    publishBoardUpdate(board);
+  } catch (err) {
+    console.warn('Cloud sync broadcast error:', err);
+  }
 }
 
 export function broadcastTriggerSound(soundType: string, volume: number = 0.7) {
@@ -46,6 +54,14 @@ export function broadcastTriggerSound(soundType: string, volume: number = 0.7) {
     }
   } catch (err) {
     console.warn('BroadcastChannel sound error:', err);
+  }
+
+  // Also broadcast sound to cloud listeners (OBS)
+  try {
+    // We can broadcast to all active boards or generic
+    publishSound('global', soundType, volume);
+  } catch (err) {
+    console.warn('Cloud sync sound error:', err);
   }
 }
 

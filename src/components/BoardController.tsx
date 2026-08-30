@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ScoreboardData, OverlayLayout, FontFamilyChoice, OverlayBackground } from '../types';
 import { saveBoard, broadcastTriggerSound } from '../utils/storage';
+import { initRealtimeSync, publishBoardUpdate, encodeBoardToUrlParam } from '../utils/realtimeSync';
 import { playSound } from '../utils/audio';
 import { POPULAR_TEAMS_PRESETS, COMPETITION_PRESETS } from '../data/teamPresets';
 import {
@@ -53,7 +54,30 @@ export const BoardController: React.FC<BoardControllerProps> = ({
   const [showConfetti, setShowConfetti] = useState(false);
   const [showHotkeysModal, setShowHotkeysModal] = useState(false);
 
-  // Sync state changes to storage & BroadcastChannel
+  // Initialize Realtime Cloud Sync (MQTT / WebSockets) so OBS Browser Source syncs from any machine/process
+  useEffect(() => {
+    // Initial publish
+    publishBoardUpdate(board);
+
+    const cleanup = initRealtimeSync(
+      board.id,
+      undefined,
+      undefined,
+      true // Is controller: answers REQUEST_STATE pings from OBS!
+    );
+
+    // Heartbeat publish every 5 seconds to ensure OBS stays 100% in sync
+    const heartbeat = setInterval(() => {
+      publishBoardUpdate(board);
+    }, 5000);
+
+    return () => {
+      cleanup();
+      clearInterval(heartbeat);
+    };
+  }, [board.id]);
+
+  // Sync state changes to storage & BroadcastChannel & Cloud Relay
   const updateBoard = (updater: (prev: ScoreboardData) => ScoreboardData) => {
     setBoard((prev) => {
       const next = updater(prev);
