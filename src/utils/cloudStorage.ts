@@ -56,7 +56,10 @@ export async function syncBoardToCloud(board: ScoreboardData): Promise<boolean> 
     clearTimeout(timeoutId);
 
     if (res.ok) {
-      cloudSqlSuccess = true;
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        cloudSqlSuccess = true;
+      }
     }
   } catch (err) {
     // Non-fatal, continue to fallback
@@ -108,10 +111,13 @@ export async function fetchBoardFromCloud(boardId: string): Promise<ScoreboardDa
     clearTimeout(timeoutId);
 
     if (res.ok) {
-      const data = await res.json();
-      if (data && data.id === boardId) {
-        memoryCache.set(boardId, { data, timestamp: Date.now() });
-        return data as ScoreboardData;
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        const data = await res.json();
+        if (data && data.id === boardId) {
+          memoryCache.set(boardId, { data, timestamp: Date.now() });
+          return data as ScoreboardData;
+        }
       }
     }
   } catch (err) {
@@ -155,9 +161,12 @@ export async function fetchAllBoardsFromCloud(): Promise<ScoreboardData[]> {
       headers: { Accept: 'application/json', ...authHeaders },
     });
     if (res.ok) {
-      const boards = await res.json();
-      if (Array.isArray(boards)) {
-        return boards;
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        const boards = await res.json();
+        if (Array.isArray(boards)) {
+          return boards;
+        }
       }
     }
   } catch (err) {
