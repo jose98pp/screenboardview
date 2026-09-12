@@ -69,6 +69,11 @@ export const BoardController: React.FC<BoardControllerProps> = ({
   const [isEditingTitle, setIsEditingTitle] = useState<boolean>(false);
   const [titleInputValue, setTitleInputValue] = useState<string>(initialBoard.title);
 
+  const boardRef = useRef<ScoreboardData>(board);
+  useEffect(() => {
+    boardRef.current = board;
+  }, [board]);
+
   // Explicit save action with visual feedback
   const handleExplicitSave = (customMsg?: string) => {
     setIsSaving(true);
@@ -120,19 +125,22 @@ export const BoardController: React.FC<BoardControllerProps> = ({
   // Initialize Realtime Cloud Sync (MQTT / WebSockets) so OBS Browser Source syncs from any machine/process
   useEffect(() => {
     // Initial publish
-    publishBoardUpdate(board);
+    publishBoardUpdate(boardRef.current);
 
     const cleanup = initRealtimeSync(
       board.id,
       undefined,
       undefined,
-      true // Is controller: answers REQUEST_STATE pings from OBS!
+      true, // Is controller: answers REQUEST_STATE pings from OBS!
+      () => boardRef.current
     );
 
-    // Heartbeat publish every 5 seconds to ensure OBS stays 100% in sync
+    // Heartbeat publish every 4 seconds to ensure OBS stays 100% in sync with the current board state
     const heartbeat = setInterval(() => {
-      publishBoardUpdate(board);
-    }, 5000);
+      if (boardRef.current) {
+        publishBoardUpdate(boardRef.current);
+      }
+    }, 4000);
 
     return () => {
       cleanup();
@@ -430,8 +438,8 @@ export const BoardController: React.FC<BoardControllerProps> = ({
     }
   };
 
-  const overlayUrl = getOverlayUrl(board.id);
-  const mutedOverlayUrl = getOverlayUrl(board.id, { muted: true });
+  const overlayUrl = getOverlayUrl(board.id, { layout: board.overlay.layout });
+  const mutedOverlayUrl = getOverlayUrl(board.id, { muted: true, layout: board.overlay.layout });
 
   const copyObsUrl = () => {
     navigator.clipboard.writeText(overlayUrl);

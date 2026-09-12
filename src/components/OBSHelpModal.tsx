@@ -33,8 +33,8 @@ export const OBSHelpModal: React.FC<OBSHelpModalProps> = ({ isOpen, onClose, boa
   if (!isOpen) return null;
 
   const currentBoard = selectedId ? getBoardById(selectedId) || allBoards.find(b => b.id === selectedId) : null;
-  const overlayUrl = selectedId ? getOverlayUrl(selectedId) : '';
-  const mutedOverlayUrl = selectedId ? getOverlayUrl(selectedId, { muted: true }) : '';
+  const overlayUrl = selectedId ? getOverlayUrl(selectedId, { layout: currentBoard?.overlay?.layout }) : '';
+  const mutedOverlayUrl = selectedId ? getOverlayUrl(selectedId, { muted: true, layout: currentBoard?.overlay?.layout }) : '';
   const compressedData = currentBoard ? encodeBoardToUrlParam(currentBoard) : '';
   const instantDataUrl = selectedId && compressedData
     ? `${overlayUrl}&data=${compressedData}`

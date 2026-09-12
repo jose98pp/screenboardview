@@ -13,12 +13,14 @@ interface BoardSubscriber {
   updateCallbacks: Set<(board: ScoreboardData) => void>;
   soundCallbacks: Set<(soundType: string, volume: number) => void>;
   isController: boolean;
+  getLatestBoard?: () => ScoreboardData | null;
 }
 
 let mqttClient: MqttClient | null = null;
 let currentBrokerIndex = 0;
 const boardSubscribers = new Map<string, BoardSubscriber>();
 const subscribedTopics = new Set<string>();
+const pendingRetainedMessages = new Map<string, { topic: string; payload: string; retain: boolean }>();
 
 export function getMqttTopic(boardId: string): string {
   // Safe alphanumeric topic uniquely scoped per board ID
@@ -43,11 +45,28 @@ function ensureMqttClient(): MqttClient | null {
 
     mqttClient.on('connect', () => {
       console.log(`[RealtimeSync] Conectado a broker MQTT: ${brokerUrl}`);
+
+      // Flush any messages that were queued while connecting
+      if (pendingRetainedMessages.size > 0) {
+        pendingRetainedMessages.forEach((item) => {
+          mqttClient?.publish(item.topic, item.payload, { qos: 1, retain: item.retain });
+        });
+        pendingRetainedMessages.clear();
+      }
+
       // Resubscribe to all active topics with QoS 1 to guarantee reception of retained messages
-      boardSubscribers.forEach((_, boardId) => {
+      boardSubscribers.forEach((sub, boardId) => {
         const topic = getMqttTopic(boardId);
         mqttClient?.subscribe(topic, { qos: 1 });
         subscribedTopics.add(topic);
+
+        // If this client is the active controller, immediately republish current state
+        if (sub.isController && sub.getLatestBoard) {
+          const latest = sub.getLatestBoard();
+          if (latest) {
+            publishBoardUpdate(latest);
+          }
+        }
       });
     });
 
@@ -58,6 +77,18 @@ function ensureMqttClient(): MqttClient | null {
 
         if (msg.type === 'BOARD_UPDATED' && msg.board && targetBoardId) {
           const incomingBoard = msg.board as ScoreboardData;
+
+          // Anti-stale protection: If we already have a strictly newer board locally, do not let an older packet overwrite it
+          const currentLocal = getBoardById(targetBoardId);
+          if (
+            currentLocal &&
+            currentLocal.updatedAt &&
+            incomingBoard.updatedAt &&
+            incomingBoard.updatedAt < currentLocal.updatedAt
+          ) {
+            return;
+          }
+
           // Store locally in this browser window / OBS CEF
           saveBoard(incomingBoard, { skipBroadcast: true });
 
@@ -75,8 +106,8 @@ function ensureMqttClient(): MqttClient | null {
         } else if (msg.type === 'REQUEST_STATE' && targetBoardId) {
           const subscriber = boardSubscribers.get(targetBoardId);
           if (subscriber && subscriber.isController) {
-            // Reply with the latest state for this specific board
-            const current = getBoardById(targetBoardId);
+            // Reply with the latest live state for this specific board
+            const current = subscriber.getLatestBoard ? subscriber.getLatestBoard() : getBoardById(targetBoardId);
             if (current) {
               publishBoardUpdate(current);
             }
@@ -120,7 +151,8 @@ export function initRealtimeSync(
   boardId: string,
   onBoardUpdate?: (board: ScoreboardData) => void,
   onSound?: (soundType: string, volume: number) => void,
-  isController: boolean = false
+  isController: boolean = false,
+  getLatestBoard?: () => ScoreboardData | null
 ): () => void {
   if (!boardId) return () => {};
 
@@ -134,10 +166,12 @@ export function initRealtimeSync(
       updateCallbacks: new Set(),
       soundCallbacks: new Set(),
       isController,
+      getLatestBoard,
     };
     boardSubscribers.set(boardId, sub);
   } else {
     if (isController) sub.isController = true;
+    if (getLatestBoard) sub.getLatestBoard = getLatestBoard;
   }
 
   if (onBoardUpdate) sub.updateCallbacks.add(onBoardUpdate);
@@ -188,8 +222,12 @@ export function publishMessage(boardId: string, data: Record<string, unknown>, r
   if (!boardId) return;
   const client = ensureMqttClient();
   const topic = getMqttTopic(boardId);
+  const payload = JSON.stringify(data);
   if (client && client.connected) {
-    client.publish(topic, JSON.stringify(data), { qos: 1, retain });
+    client.publish(topic, payload, { qos: 1, retain });
+  } else if (retain) {
+    // Queue retained message so it's sent immediately once connected
+    pendingRetainedMessages.set(boardId, { topic, payload, retain: true });
   }
 }
 

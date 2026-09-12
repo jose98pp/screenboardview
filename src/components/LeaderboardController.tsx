@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ScoreboardData, PlayerScore } from '../types';
 import { saveBoard, broadcastTriggerSound } from '../utils/storage';
 import { initRealtimeSync, publishBoardUpdate } from '../utils/realtimeSync';
@@ -62,11 +62,32 @@ export const LeaderboardController: React.FC<LeaderboardControllerProps> = ({
     }
   };
 
+  const boardRef = useRef<ScoreboardData>(board);
+  useEffect(() => {
+    boardRef.current = board;
+  }, [board]);
+
   // Cloud Realtime sync
   useEffect(() => {
-    publishBoardUpdate(board);
-    const cleanup = initRealtimeSync(board.id, undefined, undefined, true);
-    return () => cleanup();
+    publishBoardUpdate(boardRef.current);
+    const cleanup = initRealtimeSync(
+      board.id,
+      undefined,
+      undefined,
+      true,
+      () => boardRef.current
+    );
+
+    const heartbeat = setInterval(() => {
+      if (boardRef.current) {
+        publishBoardUpdate(boardRef.current);
+      }
+    }, 4000);
+
+    return () => {
+      cleanup();
+      clearInterval(heartbeat);
+    };
   }, [board.id]);
 
   const updateBoard = (updater: (prev: ScoreboardData) => ScoreboardData) => {

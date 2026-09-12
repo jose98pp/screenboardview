@@ -2,44 +2,50 @@
  * URL Utilities for OBS Studio Browser Sources and Overlays
  */
 
+import { OverlayLayout } from '../types';
+
 export interface ParsedRoute {
   isOverlay: boolean;
   boardId: string | null;
+  layout: OverlayLayout | null;
   compressedData: string | null;
   isMuted: boolean;
 }
 
 /**
  * Returns the canonical, unique URL for an OBS Browser Source overlay
- * e.g. https://.../?mode=overlay&id=sb_soccer_123
+ * e.g. https://.../?mode=overlay&id=sb_soccer_123&layout=scorebug_narrow
  */
-export function getOverlayUrl(boardId: string, options?: { muted?: boolean }): string {
+export function getOverlayUrl(boardId: string, options?: { muted?: boolean; layout?: OverlayLayout | string }): string {
   if (typeof window === 'undefined') return '';
   const origin = window.location.origin;
   const muteSuffix = options?.muted ? '&mute=1' : '';
-  return `${origin}/?mode=overlay&id=${encodeURIComponent(boardId)}${muteSuffix}`;
+  const layoutSuffix = options?.layout ? `&layout=${encodeURIComponent(options.layout)}` : '';
+  return `${origin}/?mode=overlay&id=${encodeURIComponent(boardId)}${layoutSuffix}${muteSuffix}`;
 }
 
 /**
  * Returns an alternative direct overlay URL
  * e.g. https://.../?overlay=sb_soccer_123
  */
-export function getDirectOverlayUrl(boardId: string, options?: { muted?: boolean }): string {
+export function getDirectOverlayUrl(boardId: string, options?: { muted?: boolean; layout?: OverlayLayout | string }): string {
   if (typeof window === 'undefined') return '';
   const origin = window.location.origin;
   const muteSuffix = options?.muted ? '&mute=1' : '';
-  return `${origin}/?overlay=${encodeURIComponent(boardId)}${muteSuffix}`;
+  const layoutSuffix = options?.layout ? `&layout=${encodeURIComponent(options.layout)}` : '';
+  return `${origin}/?overlay=${encodeURIComponent(boardId)}${layoutSuffix}${muteSuffix}`;
 }
 
 /**
  * Returns a hash-based overlay URL (useful for strict static hosts or subpaths)
  * e.g. https://.../#/overlay/sb_soccer_123
  */
-export function getHashOverlayUrl(boardId: string, options?: { muted?: boolean }): string {
+export function getHashOverlayUrl(boardId: string, options?: { muted?: boolean; layout?: OverlayLayout | string }): string {
   if (typeof window === 'undefined') return '';
   const origin = window.location.origin;
   const muteSuffix = options?.muted ? '?mute=1' : '';
-  return `${origin}/#/overlay/${encodeURIComponent(boardId)}${muteSuffix}`;
+  const layoutSuffix = options?.layout ? `&layout=${encodeURIComponent(options.layout)}` : '';
+  return `${origin}/#/overlay/${encodeURIComponent(boardId)}${layoutSuffix}${muteSuffix}`;
 }
 
 /**
@@ -48,13 +54,14 @@ export function getHashOverlayUrl(boardId: string, options?: { muted?: boolean }
  */
 export function parseCurrentRoute(): ParsedRoute {
   if (typeof window === 'undefined') {
-    return { isOverlay: false, boardId: null, compressedData: null, isMuted: false };
+    return { isOverlay: false, boardId: null, layout: null, compressedData: null, isMuted: false };
   }
 
   const searchParams = new URLSearchParams(window.location.search);
   const modeParam = searchParams.get('mode');
   const overlayParam = searchParams.get('overlay');
   const idParam = searchParams.get('id');
+  const layoutParam = searchParams.get('layout') as OverlayLayout | null;
   const dataParam = searchParams.get('data');
   const muteParam = searchParams.get('mute');
   const soundParam = searchParams.get('sound');
@@ -74,6 +81,7 @@ export function parseCurrentRoute(): ParsedRoute {
     return {
       isOverlay: true,
       boardId: idParam || (overlayParam && overlayParam !== 'true' ? overlayParam : null),
+      layout: layoutParam,
       compressedData: dataParam,
       isMuted,
     };
@@ -84,6 +92,7 @@ export function parseCurrentRoute(): ParsedRoute {
     return {
       isOverlay: true,
       boardId: overlayParam,
+      layout: layoutParam,
       compressedData: dataParam,
       isMuted,
     };
@@ -94,6 +103,7 @@ export function parseCurrentRoute(): ParsedRoute {
     return {
       isOverlay: true,
       boardId: idParam,
+      layout: layoutParam,
       compressedData: dataParam,
       isMuted,
     };
@@ -107,6 +117,7 @@ export function parseCurrentRoute(): ParsedRoute {
       return {
         isOverlay: true,
         boardId: decodeURIComponent(extractedId),
+        layout: layoutParam,
         compressedData: dataParam,
         isMuted,
       };
@@ -119,6 +130,7 @@ export function parseCurrentRoute(): ParsedRoute {
     return {
       isOverlay: true,
       boardId: decodeURIComponent(extractedId),
+      layout: layoutParam,
       compressedData: dataParam,
       isMuted,
     };
@@ -127,6 +139,7 @@ export function parseCurrentRoute(): ParsedRoute {
   return {
     isOverlay: false,
     boardId: idParam,
+    layout: layoutParam,
     compressedData: dataParam,
     isMuted,
   };
