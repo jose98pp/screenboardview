@@ -211,7 +211,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onGoHome, onOpenObsHelp }) => {
 
             <div className="mt-6 flex flex-col sm:flex-row gap-2.5 justify-end">
               <a
-                href="https://console.firebase.google.com/project/temporal-moon-llxdt/authentication/settings"
+                href="https://console.firebase.google.com/project/stocky-iq9xd/authentication/settings"
                 target="_blank"
                 rel="noreferrer"
                 className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-900/40 transition-all active:scale-95"
