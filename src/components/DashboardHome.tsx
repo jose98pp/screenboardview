@@ -32,7 +32,8 @@ import {
   Radio,
   Sliders,
   CheckCircle2,
-  HardDrive
+  HardDrive,
+  Database
 } from 'lucide-react';
 
 interface DashboardHomeProps {
@@ -174,8 +175,8 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                   OBS LIVE SYNC READY
                 </div>
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-900 text-slate-300 rounded-full border border-slate-700/80 text-xs font-mono">
-                  <HardDrive className="h-3.5 w-3.5 text-indigo-400" />
-                  <span>Memoria Local Segura (IndexedDB + LocalStorage)</span>
+                  <Database className="h-3.5 w-3.5 text-indigo-400" />
+                  <span>Cloud SQL (us-west1) + Memoria Local</span>
                 </div>
               </div>
               <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight uppercase">

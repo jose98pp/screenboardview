@@ -5,7 +5,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { ScoreboardData } from './types';
-import { loadAllBoards, getBoardById } from './utils/storage';
+import { loadAllBoards, getBoardById, saveBoard } from './utils/storage';
+import { fetchAllBoardsFromCloud } from './utils/cloudStorage';
 import { parseCurrentRoute } from './utils/urlHelper';
 import { Navbar } from './components/Navbar';
 import { DashboardHome } from './components/DashboardHome';
@@ -25,7 +26,7 @@ export default function App() {
 
   // Initialize & parse route (supporting query param ?mode=overlay&id=XYZ, ?overlay=XYZ, #/overlay/XYZ, /overlay/XYZ)
   useEffect(() => {
-    const handleRouteCheck = () => {
+    const handleRouteCheck = async () => {
       const route = parseCurrentRoute();
       if (route.isOverlay) {
         setIsOverlayMode(true);
@@ -39,6 +40,19 @@ export default function App() {
         if (route.boardId) {
           const found = all.find((b) => b.id === route.boardId);
           if (found) setSelectedBoardId(route.boardId);
+        }
+
+        // Asynchronously sync from Cloud SQL in background
+        try {
+          const cloudBoards = await fetchAllBoardsFromCloud();
+          if (cloudBoards && cloudBoards.length > 0) {
+            cloudBoards.forEach((cb) => {
+              saveBoard(cb, { skipBroadcast: true });
+            });
+            setBoards(loadAllBoards());
+          }
+        } catch {
+          // Non-fatal, local boards remain active
         }
       }
     };
@@ -54,9 +68,20 @@ export default function App() {
     };
   }, []);
 
-  const refreshBoards = () => {
+  const refreshBoards = async () => {
     const all = loadAllBoards();
     setBoards(all);
+    try {
+      const cloudBoards = await fetchAllBoardsFromCloud();
+      if (cloudBoards && cloudBoards.length > 0) {
+        cloudBoards.forEach((cb) => {
+          saveBoard(cb, { skipBroadcast: true });
+        });
+        setBoards(loadAllBoards());
+      }
+    } catch {
+      // Non-fatal
+    }
   };
 
   const handleSelectBoard = (board: ScoreboardData) => {
